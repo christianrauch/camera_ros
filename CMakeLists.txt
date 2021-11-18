@@ -19,23 +19,29 @@ find_package(PkgConfig REQUIRED)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
 pkg_check_modules(libcamera REQUIRED libcamera)
 
-add_executable(camera src/camera.cpp)
-target_include_directories(camera PUBLIC
+add_library(camera_component SHARED src/CameraNode.cpp)
+rclcpp_components_register_node(camera_component PLUGIN "camera::CameraNode" EXECUTABLE "camera_node")
+
+target_include_directories(camera_component PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(
-  camera
+  camera_component
+  "rclcpp"
+  "rclcpp_components"
   "sensor_msgs"
 )
 
-target_include_directories(camera PUBLIC ${libcamera_INCLUDE_DIRS})
-target_link_libraries(camera ${libcamera_LINK_LIBRARIES})
+target_include_directories(camera_component PUBLIC ${libcamera_INCLUDE_DIRS})
+target_link_libraries(camera_component ${libcamera_LINK_LIBRARIES})
 
-install(TARGETS camera
-  DESTINATION lib/${PROJECT_NAME})
+install(TARGETS camera_component
+  DESTINATION lib)
 
 if(BUILD_TESTING)
   set(ament_cmake_clang_format_CONFIG_FILE "${CMAKE_SOURCE_DIR}/.clang-format")
