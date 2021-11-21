@@ -5,7 +5,9 @@
 #include <libcamera/framebuffer_allocator.h>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
+#include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/compressed_image.hpp>
+#include <sensor_msgs/msg/image.hpp>
 #include <sys/mman.h>
 
 
@@ -27,7 +29,8 @@ private:
   // timestamp offset (ns) from camera time to system time
   int64_t time_offset = 0;
 
-  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr pub_image;
+  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_image;
+  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr pub_image_compressed;
 
   void requestComplete(libcamera::Request *request);
 };
@@ -42,8 +45,9 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   param_descr_format.read_only = true;
   declare_parameter<std::string>("format", {}, param_descr_format);
 
-  // publisher for compressed image
-  pub_image =
+  // publisher for raw and compressed image
+  pub_image = this->create_publisher<sensor_msgs::msg::Image>("~/image_raw", 1);
+  pub_image_compressed =
     this->create_publisher<sensor_msgs::msg::CompressedImage>("~/image_raw/compressed", 1);
 
   // start camera manager and check for cameras
@@ -172,14 +176,30 @@ void CameraNode::requestComplete(libcamera::Request *request)
     std::cerr << "mmap failed: " << std::strerror(errno) << std::endl;
 
   // send image data
-  switch (stream->configuration().pixelFormat) {
+  std_msgs::msg::Header hdr;
+  hdr.stamp = rclcpp::Time(time_offset + int64_t(metadata.timestamp));
+  hdr.frame_id = "camera";
+  const libcamera::StreamConfiguration &cfg = stream->configuration();
+  switch (cfg.pixelFormat) {
   case libcamera::formats::MJPEG:
   {
     // publish JPEG image
-    sensor_msgs::msg::CompressedImage msg_img;
-    msg_img.header.stamp = rclcpp::Time(time_offset + int64_t(metadata.timestamp));
-    msg_img.header.frame_id = "camera";
-    msg_img.format = "jpeg";
+    sensor_msgs::msg::CompressedImage msg_img_jpeg;
+    msg_img_jpeg.header = hdr;
+    msg_img_jpeg.format = "jpeg";
+    msg_img_jpeg.data.resize(buffer_size);
+    memcpy(msg_img_jpeg.data.data(), memory, buffer_size);
+    pub_image_compressed->publish(msg_img_jpeg);
+    break;
+  }
+  case libcamera::formats::YUYV:
+  {
+    sensor_msgs::msg::Image msg_img;
+    msg_img.header = hdr;
+    msg_img.encoding = sensor_msgs::image_encodings::YUV422_YUY2;
+    msg_img.width = cfg.size.width;
+    msg_img.height = cfg.size.height;
+    msg_img.step = cfg.stride;
     msg_img.data.resize(buffer_size);
     memcpy(msg_img.data.data(), memory, buffer_size);
     pub_image->publish(msg_img);
