@@ -36,6 +36,12 @@ RCLCPP_COMPONENTS_REGISTER_NODE(camera::CameraNode)
 
 CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options)
 {
+  // pixel format
+  rcl_interfaces::msg::ParameterDescriptor param_descr_format;
+  param_descr_format.description = "pixel format of streaming buffer";
+  param_descr_format.read_only = true;
+  declare_parameter<std::string>("format", {}, param_descr_format);
+
   // publisher for compressed image
   pub_image =
     this->create_publisher<sensor_msgs::msg::CompressedImage>("~/image_raw/compressed", 1);
@@ -78,7 +84,12 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   }
 
   libcamera::StreamConfiguration &scfg = cfg->at(0);
-  scfg.pixelFormat = libcamera::formats::MJPEG;
+  const std::string format = get_parameter("format").as_string();
+  // get pixel format from provided string or use first available format otherwise
+  if (format.empty())
+    scfg.pixelFormat = scfg.formats().pixelformats().at(0);
+  else
+    scfg.pixelFormat = libcamera::PixelFormat::fromString(format);
 
   switch (cfg->validate()) {
   case libcamera::CameraConfiguration::Valid:
