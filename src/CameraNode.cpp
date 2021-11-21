@@ -60,6 +60,23 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   if (!cfg)
     throw std::runtime_error("failed to generate configuration");
 
+  // show all supported stream configurations and pixel formats
+  std::cout << ">> stream configurations:" << std::endl;
+  for (size_t i = 0; i < cfg->size(); i++) {
+    const libcamera::StreamConfiguration &scfg = cfg->at(i);
+    const libcamera::StreamFormats &formats = scfg.formats();
+
+    std::cout << i << ": " << scfg.toString() << std::endl;
+    for (const libcamera::PixelFormat &pixelformat : formats.pixelformats()) {
+      std::cout << "  - Pixelformat: " << pixelformat.toString() << " ("
+                << formats.range(pixelformat).min.toString() << " - "
+                << formats.range(pixelformat).max.toString() << ")" << std::endl;
+      std::cout << "    Sizes:" << std::endl;
+      for (const libcamera::Size &size : formats.sizes(pixelformat))
+        std::cout << "     - " << size.toString() << std::endl;
+    }
+  }
+
   libcamera::StreamConfiguration &scfg = cfg->at(0);
   scfg.pixelFormat = libcamera::formats::MJPEG;
 
