@@ -37,6 +37,46 @@ private:
 
 RCLCPP_COMPONENTS_REGISTER_NODE(camera::CameraNode)
 
+
+struct buffer_t
+{
+  void *data;
+  size_t size;
+};
+
+//mapping of FourCC to ROS image encodings
+// see 'include/uapi/drm/drm_fourcc.h' for a full FourCC list
+
+// supported FourCC formats, without conversion
+const std::unordered_map<uint32_t, std::string> map_format_raw = {
+  // RGB encodings
+  // NOTE: Following the DRM definition, RGB formats codes are stored in little-endian order.
+  {libcamera::formats::R8.fourcc(), sensor_msgs::image_encodings::MONO8},
+  {libcamera::formats::RGB888.fourcc(), sensor_msgs::image_encodings::BGR8},
+  {libcamera::formats::BGR888.fourcc(), sensor_msgs::image_encodings::RGB8},
+  {libcamera::formats::XRGB8888.fourcc(), sensor_msgs::image_encodings::BGRA8},
+  {libcamera::formats::XBGR8888.fourcc(), sensor_msgs::image_encodings::RGBA8},
+  {libcamera::formats::ARGB8888.fourcc(), sensor_msgs::image_encodings::BGRA8},
+  {libcamera::formats::ABGR8888.fourcc(), sensor_msgs::image_encodings::RGBA8},
+  // YUV encodings
+  {libcamera::formats::YUYV.fourcc(), sensor_msgs::image_encodings::YUV422_YUY2},
+  {libcamera::formats::UYVY.fourcc(), sensor_msgs::image_encodings::YUV422},
+  // Bayer encodings
+  {libcamera::formats::SRGGB8.fourcc(), sensor_msgs::image_encodings::BAYER_RGGB8},
+  {libcamera::formats::SGRBG8.fourcc(), sensor_msgs::image_encodings::BAYER_GRBG8},
+  {libcamera::formats::SGBRG8.fourcc(), sensor_msgs::image_encodings::BAYER_GBRG8},
+  {libcamera::formats::SBGGR8.fourcc(), sensor_msgs::image_encodings::BAYER_BGGR8},
+  {libcamera::formats::SRGGB16.fourcc(), sensor_msgs::image_encodings::BAYER_RGGB16},
+  {libcamera::formats::SGRBG16.fourcc(), sensor_msgs::image_encodings::BAYER_GRBG16},
+  {libcamera::formats::SGBRG16.fourcc(), sensor_msgs::image_encodings::BAYER_GBRG16},
+  {libcamera::formats::SBGGR16.fourcc(), sensor_msgs::image_encodings::BAYER_BGGR16},
+};
+
+// supported FourCC formats, without conversion, compressed
+const std::unordered_map<uint32_t, std::string> map_format_compressed = {
+  {libcamera::formats::MJPEG.fourcc(), "jpeg"},
+};
+
 CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options)
 {
   // pixel format
@@ -89,11 +129,24 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
   libcamera::StreamConfiguration &scfg = cfg->at(0);
   const std::string format = get_parameter("format").as_string();
-  // get pixel format from provided string or use first available format otherwise
-  if (format.empty())
-    scfg.pixelFormat = scfg.formats().pixelformats().at(0);
-  else
+  if (format.empty()) {
+    // find first supported pixel format available by camera
+    scfg.pixelFormat = {};
+    for (const libcamera::PixelFormat &pixelformat : scfg.formats().pixelformats()) {
+      if (map_format_raw.count(pixelformat.fourcc()) ||
+          map_format_compressed.count(pixelformat.fourcc())) {
+        scfg.pixelFormat = pixelformat;
+        break;
+      }
+    }
+
+    if (!scfg.pixelFormat.isValid())
+      throw std::runtime_error("camera does not provide any of the supported pixel formats");
+  }
+  else {
+    // get pixel format from provided string
     scfg.pixelFormat = libcamera::PixelFormat::fromString(format);
+  }
 
   switch (cfg->validate()) {
   case libcamera::CameraConfiguration::Valid:
@@ -167,51 +220,56 @@ void CameraNode::requestComplete(libcamera::Request *request)
   if (time_offset == 0)
     time_offset = this->now().nanoseconds() - metadata.timestamp;
 
-  // memory-map the frame buffer content
-  assert(buffer->planes().size() == 1 && metadata.planes().size() == 1);
-  const size_t buffer_size = metadata.planes()[0].bytesused;
-  void *memory =
-    mmap(NULL, buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, buffer->planes()[0].fd.get(), 0);
-  if (memory == MAP_FAILED)
-    std::cerr << "mmap failed: " << std::strerror(errno) << std::endl;
+  // memory-map the frame buffer planes
+  assert(buffer->planes().size() == metadata.planes().size());
+  std::vector<buffer_t> buffers;
+  for (size_t i = 0; i < buffer->planes().size(); i++) {
+    buffer_t mem;
+    mem.size = metadata.planes()[i].bytesused;
+    mem.data =
+      mmap(NULL, mem.size, PROT_READ | PROT_WRITE, MAP_SHARED, buffer->planes()[i].fd.get(), 0);
+    buffers.push_back(mem);
+    if (mem.data == MAP_FAILED)
+      std::cerr << "mmap failed: " << std::strerror(errno) << std::endl;
+  }
 
   // send image data
   std_msgs::msg::Header hdr;
   hdr.stamp = rclcpp::Time(time_offset + int64_t(metadata.timestamp));
   hdr.frame_id = "camera";
   const libcamera::StreamConfiguration &cfg = stream->configuration();
-  switch (cfg.pixelFormat) {
-  case libcamera::formats::MJPEG:
-  {
-    // publish JPEG image
-    sensor_msgs::msg::CompressedImage msg_img_jpeg;
-    msg_img_jpeg.header = hdr;
-    msg_img_jpeg.format = "jpeg";
-    msg_img_jpeg.data.resize(buffer_size);
-    memcpy(msg_img_jpeg.data.data(), memory, buffer_size);
-    pub_image_compressed->publish(msg_img_jpeg);
-    break;
-  }
-  case libcamera::formats::YUYV:
-  {
+
+  if (map_format_raw.count(cfg.pixelFormat.fourcc())) {
+    // raw
+    assert(buffers.size() == 1);
     sensor_msgs::msg::Image msg_img;
     msg_img.header = hdr;
-    msg_img.encoding = sensor_msgs::image_encodings::YUV422_YUY2;
+    msg_img.encoding = map_format_raw.at(cfg.pixelFormat.fourcc());
     msg_img.width = cfg.size.width;
     msg_img.height = cfg.size.height;
     msg_img.step = cfg.stride;
-    msg_img.data.resize(buffer_size);
-    memcpy(msg_img.data.data(), memory, buffer_size);
+    msg_img.data.resize(buffers[0].size);
+    memcpy(msg_img.data.data(), buffers[0].data, buffers[0].size);
     pub_image->publish(msg_img);
-    break;
   }
-  default:
+  else if (map_format_compressed.count(cfg.pixelFormat.fourcc())) {
+    // compressed
+    assert(buffers.size() == 1);
+    sensor_msgs::msg::CompressedImage msg_img_jpeg;
+    msg_img_jpeg.header = hdr;
+    msg_img_jpeg.format = map_format_compressed.at(cfg.pixelFormat.fourcc());
+    msg_img_jpeg.data.resize(buffers[0].size);
+    memcpy(msg_img_jpeg.data.data(), buffers[0].data, buffers[0].size);
+    pub_image_compressed->publish(msg_img_jpeg);
+  }
+  else {
     throw std::runtime_error("unsupported pixel format: " +
                              stream->configuration().pixelFormat.toString());
   }
 
-  if (munmap(memory, buffer_size) == -1)
-    std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
+  for (const buffer_t &mem : buffers)
+    if (munmap(mem.data, mem.size) == -1)
+      std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
 
   // queue the request again for the next frame
   request->reuse(libcamera::Request::ReuseBuffers);
