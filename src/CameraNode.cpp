@@ -1,5 +1,6 @@
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <cstring>
+#include <cv_bridge/cv_bridge.h>
 #include <libcamera/camera.h>
 #include <libcamera/camera_manager.h>
 #include <libcamera/formats.h>
@@ -286,7 +287,14 @@ void CameraNode::requestComplete(libcamera::Request *request)
     msg_img->encoding = map_format_raw.at(cfg.pixelFormat.fourcc());
     msg_img->data.resize(buffers[0].size);
     memcpy(msg_img->data.data(), buffers[0].data, buffers[0].size);
+
+    // compress to jpeg
+    sensor_msgs::msg::CompressedImage::UniquePtr msg_img_compressed;
+    msg_img_compressed = std::make_unique<sensor_msgs::msg::CompressedImage>();
+    cv_bridge::toCvCopy(*msg_img)->toCompressedImageMsg(*msg_img_compressed);
+
     pub_image->publish(std::move(msg_img));
+    pub_image_compressed->publish(std::move(msg_img_compressed));
   }
   else if (map_format_compressed.count(cfg.pixelFormat.fourcc())) {
     // compressed image
@@ -297,6 +305,13 @@ void CameraNode::requestComplete(libcamera::Request *request)
     msg_img_compressed->format = map_format_compressed.at(cfg.pixelFormat.fourcc());
     msg_img_compressed->data.resize(buffers[0].size);
     memcpy(msg_img_compressed->data.data(), buffers[0].data, buffers[0].size);
+
+    // decompress into raw rgb8 image
+    sensor_msgs::msg::Image::UniquePtr msg_img;
+    msg_img = std::make_unique<sensor_msgs::msg::Image>();
+    cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
+
+    pub_image->publish(std::move(msg_img));
     pub_image_compressed->publish(std::move(msg_img_compressed));
   }
   else {
