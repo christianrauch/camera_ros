@@ -2,6 +2,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <libcamera/camera.h>
 #include <libcamera/camera_manager.h>
+#include <libcamera/control_ids.h>
 #include <libcamera/formats.h>
 #include <libcamera/framebuffer_allocator.h>
 #include <libcamera/property_ids.h>
@@ -37,8 +38,18 @@ private:
 
   camera_info_manager::CameraInfoManager cim;
 
+  OnSetParametersCallbackHandle::SharedPtr callback_parameter_change;
+
+  // map parameter names to libcamera control id
+  std::unordered_map<std::string, const libcamera::ControlId *> parameter_ids;
+  libcamera::ControlList parameters;
+  std::mutex parameters_lock;
+
   void
   requestComplete(libcamera::Request *request);
+
+  rcl_interfaces::msg::SetParametersResult
+  onParameterChange(const std::vector<rclcpp::Parameter> &parameters);
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(camera::CameraNode)
@@ -210,6 +221,58 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   if (!cim.setCameraName(cname))
     throw std::runtime_error("camera name must only contain alphanumeric characters");
 
+  // dynamic camera configuration
+  std::vector<rclcpp::Parameter> parameters_initial;
+  for (const auto &[id, info] : camera->controls()) {
+    // store control id with name
+    parameter_ids[id->name()] = id;
+
+    rclcpp::ParameterValue value;
+
+    rcl_interfaces::msg::ParameterDescriptor param_descr;
+    rcl_interfaces::msg::IntegerRange range_int;
+    rcl_interfaces::msg::FloatingPointRange range_float;
+
+    switch (info.def().type()) {
+    case libcamera::ControlTypeBool:
+      value = rclcpp::ParameterValue(info.def().get<bool>());
+      break;
+    case libcamera::ControlTypeInteger32:
+      value = rclcpp::ParameterValue(info.def().get<int32_t>());
+      range_int.from_value = info.min().get<int32_t>();
+      range_int.to_value = info.max().get<int32_t>();
+      break;
+    case libcamera::ControlTypeInteger64:
+      value = rclcpp::ParameterValue(info.def().get<int64_t>());
+      range_int.from_value = info.min().get<int64_t>();
+      range_int.to_value = info.max().get<int64_t>();
+      break;
+    case libcamera::ControlTypeFloat:
+      value = rclcpp::ParameterValue(info.def().get<float>());
+      range_float.from_value = info.min().get<float>();
+      range_float.to_value = info.max().get<float>();
+      break;
+    case libcamera::ControlTypeString:
+      value = rclcpp::ParameterValue(info.def().get<std::string>());
+      break;
+    default:
+      break;
+    }
+
+    param_descr.integer_range = {range_int};
+    param_descr.floating_point_range = {range_float};
+
+    if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET)
+      declare_parameter(id->name(), value, param_descr);
+  }
+
+  // set initial parameters
+  onParameterChange(parameters_initial);
+
+  // register callback to handle parameter changes
+  callback_parameter_change = add_on_set_parameters_callback(
+    std::bind(&CameraNode::onParameterChange, this, std::placeholders::_1));
+
   // allocate stream buffers and create one request per buffer
   libcamera::Stream *stream = scfg.stream();
 
@@ -333,7 +396,61 @@ CameraNode::requestComplete(libcamera::Request *request)
 
   // queue the request again for the next frame
   request->reuse(libcamera::Request::ReuseBuffers);
+
+  // update parameters
+  parameters_lock.lock();
+  request->controls() = parameters;
+  parameters_lock.unlock();
+
   camera->queueRequest(request);
+}
+
+rcl_interfaces::msg::SetParametersResult
+CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
+{
+  for (const rclcpp::Parameter &parameter : parameters) {
+    if (parameter_ids.count(parameter.get_name())) {
+      libcamera::ControlValue value;
+      const libcamera::ControlType &type = parameter_ids.at(parameter.get_name())->type();
+      switch (parameter.get_type()) {
+      case rclcpp::ParameterType::PARAMETER_NOT_SET:
+        break;
+      case rclcpp::ParameterType::PARAMETER_BOOL:
+        value.set(parameter.as_bool());
+        break;
+      case rclcpp::ParameterType::PARAMETER_INTEGER:
+        if (type == libcamera::ControlTypeInteger32)
+          value.set(int32_t(parameter.as_int()));
+        else if (type == libcamera::ControlTypeInteger64)
+          value.set(int64_t(parameter.as_int()));
+        else
+          throw std::runtime_error("invalid type");
+        break;
+      case rclcpp::ParameterType::PARAMETER_DOUBLE:
+        value.set(float(parameter.as_double()));
+        break;
+      case rclcpp::ParameterType::PARAMETER_STRING:
+        value.set(parameter.as_string());
+        break;
+      case rclcpp::ParameterType::PARAMETER_BYTE_ARRAY:
+      case rclcpp::ParameterType::PARAMETER_BOOL_ARRAY:
+      case rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY:
+      case rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY:
+      case rclcpp::ParameterType::PARAMETER_STRING_ARRAY:
+        break;
+      }
+
+      if (!value.isNone()) {
+        parameters_lock.lock();
+        this->parameters.set(parameter_ids.at(parameter.get_name())->id(), value);
+        parameters_lock.unlock();
+      }
+    }
+  }
+
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+  return result;
 }
 
 } // namespace camera
