@@ -252,27 +252,29 @@ void CameraNode::requestComplete(libcamera::Request *request)
   const libcamera::StreamConfiguration &cfg = stream->configuration();
 
   if (map_format_raw.count(cfg.pixelFormat.fourcc())) {
-    // raw
+    // raw uncompressed image
     assert(buffers.size() == 1);
-    sensor_msgs::msg::Image msg_img;
-    msg_img.header = hdr;
-    msg_img.encoding = map_format_raw.at(cfg.pixelFormat.fourcc());
-    msg_img.width = cfg.size.width;
-    msg_img.height = cfg.size.height;
-    msg_img.step = cfg.stride;
-    msg_img.data.resize(buffers[0].size);
-    memcpy(msg_img.data.data(), buffers[0].data, buffers[0].size);
-    pub_image->publish(msg_img);
+    sensor_msgs::msg::Image::UniquePtr msg_img;
+    msg_img = std::make_unique<sensor_msgs::msg::Image>();
+    msg_img->header = hdr;
+    msg_img->width = cfg.size.width;
+    msg_img->height = cfg.size.height;
+    msg_img->step = cfg.stride;
+    msg_img->encoding = map_format_raw.at(cfg.pixelFormat.fourcc());
+    msg_img->data.resize(buffers[0].size);
+    memcpy(msg_img->data.data(), buffers[0].data, buffers[0].size);
+    pub_image->publish(std::move(msg_img));
   }
   else if (map_format_compressed.count(cfg.pixelFormat.fourcc())) {
-    // compressed
+    // compressed image
     assert(buffers.size() == 1);
-    sensor_msgs::msg::CompressedImage msg_img_jpeg;
-    msg_img_jpeg.header = hdr;
-    msg_img_jpeg.format = map_format_compressed.at(cfg.pixelFormat.fourcc());
-    msg_img_jpeg.data.resize(buffers[0].size);
-    memcpy(msg_img_jpeg.data.data(), buffers[0].data, buffers[0].size);
-    pub_image_compressed->publish(msg_img_jpeg);
+    sensor_msgs::msg::CompressedImage::UniquePtr msg_img_compressed;
+    msg_img_compressed = std::make_unique<sensor_msgs::msg::CompressedImage>();
+    msg_img_compressed->header = hdr;
+    msg_img_compressed->format = map_format_compressed.at(cfg.pixelFormat.fourcc());
+    msg_img_compressed->data.resize(buffers[0].size);
+    memcpy(msg_img_compressed->data.data(), buffers[0].data, buffers[0].size);
+    pub_image_compressed->publish(std::move(msg_img_compressed));
   }
   else {
     throw std::runtime_error("unsupported pixel format: " +
