@@ -22,6 +22,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(camera_info_manager REQUIRED)
 pkg_check_modules(libcamera REQUIRED libcamera)
 
 add_library(camera_component SHARED src/CameraNode.cpp)
@@ -35,6 +36,7 @@ ament_target_dependencies(
   "rclcpp"
   "rclcpp_components"
   "sensor_msgs"
+  "camera_info_manager"
 )
 
 target_include_directories(camera_component PUBLIC ${libcamera_INCLUDE_DIRS})

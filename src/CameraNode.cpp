@@ -1,7 +1,9 @@
+#include <camera_info_manager/camera_info_manager.hpp>
 #include <libcamera/camera.h>
 #include <libcamera/camera_manager.h>
 #include <libcamera/formats.h>
 #include <libcamera/framebuffer_allocator.h>
+#include <libcamera/property_ids.h>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <sensor_msgs/image_encodings.hpp>
@@ -30,6 +32,9 @@ private:
 
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_image;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr pub_image_compressed;
+  rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr pub_ci;
+
+  camera_info_manager::CameraInfoManager cim;
 
   void requestComplete(libcamera::Request *request);
 };
@@ -64,7 +69,7 @@ const std::unordered_map<uint32_t, std::string> map_format_compressed = {
   {libcamera::formats::MJPEG.fourcc(), "jpeg"},
 };
 
-CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options)
+CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options), cim(this)
 {
   // pixel format
   rcl_interfaces::msg::ParameterDescriptor param_descr_format;
@@ -82,6 +87,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   pub_image = this->create_publisher<sensor_msgs::msg::Image>("~/image_raw", 1);
   pub_image_compressed =
     this->create_publisher<sensor_msgs::msg::CompressedImage>("~/image_raw/compressed", 1);
+  pub_ci = this->create_publisher<sensor_msgs::msg::CameraInfo>("~/camera_info", 1);
 
   // start camera manager and check for cameras
   camera_manager.start();
@@ -166,6 +172,22 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
   std::cout << "camera \"" << camera->id() << "\" configured with " << scfg.toString() << " stream"
             << std::endl;
+
+  // format camera name for calibration file
+  const libcamera::ControlList &props = camera->properties();
+  std::string cname = camera->id() + '_' + scfg.size.toString();
+  if (props.contains(libcamera::properties::Model))
+    cname = props.get(libcamera::properties::Model).value() + '_' + cname;
+
+  // clean camera name of non-alphanumeric characters
+  cname.erase(
+    std::remove_if(cname.begin(), cname.end(), [](const char &x) { return std::isspace(x); }),
+    cname.cend());
+  std::replace_if(
+    cname.begin(), cname.end(), [](const char &x) { return !std::isalnum(x); }, '_');
+
+  if (!cim.setCameraName(cname))
+    throw std::runtime_error("camera name must only contain alphanumeric characters");
 
   // allocate stream buffers and create one request per buffer
   libcamera::Stream *stream = scfg.stream();
@@ -268,6 +290,8 @@ void CameraNode::requestComplete(libcamera::Request *request)
     throw std::runtime_error("unsupported pixel format: " +
                              stream->configuration().pixelFormat.toString());
   }
+
+  pub_ci->publish(cim.getCameraInfo());
 
   // queue the request again for the next frame
   request->reuse(libcamera::Request::ReuseBuffers);
