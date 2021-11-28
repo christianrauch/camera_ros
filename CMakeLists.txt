@@ -15,9 +15,12 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+find_package(PkgConfig REQUIRED)
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(sensor_msgs REQUIRED)
+pkg_check_modules(libcamera REQUIRED libcamera)
 
 add_executable(camera src/camera.cpp)
 target_include_directories(camera PUBLIC
@@ -27,6 +30,9 @@ ament_target_dependencies(
   camera
   "sensor_msgs"
 )
+
+target_include_directories(camera PUBLIC ${libcamera_INCLUDE_DIRS})
+target_link_libraries(camera ${libcamera_LINK_LIBRARIES})
 
 install(TARGETS camera
   DESTINATION lib/${PROJECT_NAME})
