@@ -184,6 +184,10 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   std::cout << "camera \"" << camera->id() << "\" configured with " << scfg.toString() << " stream"
             << std::endl;
 
+  set_parameter(rclcpp::Parameter("width", int64_t(scfg.size.width)));
+  set_parameter(rclcpp::Parameter("height", int64_t(scfg.size.height)));
+  set_parameter(rclcpp::Parameter("format", scfg.pixelFormat.toString()));
+
   // format camera name for calibration file
   const libcamera::ControlList &props = camera->properties();
   std::string cname = camera->id() + '_' + scfg.size.toString();
