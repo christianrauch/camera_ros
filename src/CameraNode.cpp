@@ -296,9 +296,16 @@ void CameraNode::requestComplete(libcamera::Request *request)
     // decompress into raw rgb8 image
     sensor_msgs::msg::Image::UniquePtr msg_img;
     msg_img = std::make_unique<sensor_msgs::msg::Image>();
-    cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
+    try {
+      cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
+    }
+    catch (const cv::Exception &e) {
+      msg_img = nullptr;
+      std::cerr << e.what() << std::endl;
+    }
 
-    pub_image->publish(std::move(msg_img));
+    if (msg_img)
+      pub_image->publish(std::move(msg_img));
     pub_image_compressed->publish(std::move(msg_img_compressed));
   }
   else {
