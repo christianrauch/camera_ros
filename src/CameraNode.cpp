@@ -97,6 +97,9 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   declare_parameter<int64_t>("width", {}, param_descr_ro);
   declare_parameter<int64_t>("height", {}, param_descr_ro);
 
+  // camera ID
+  declare_parameter<int64_t>("camera", 0, param_descr_ro);
+
   // publisher for raw and compressed image
   pub_image = this->create_publisher<sensor_msgs::msg::Image>("~/image_raw", 1);
   pub_image_compressed =
@@ -108,13 +111,15 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   if (camera_manager.cameras().empty())
     throw std::runtime_error("no cameras available");
 
-  // get the first camera
-  camera = camera_manager.get(camera_manager.cameras().front()->id());
+  // get the camera
+  if (size_t(get_parameter("camera").as_int()) >= camera_manager.cameras().size())
+    throw std::runtime_error("camera does not exist");
+  camera = camera_manager.cameras().at(get_parameter("camera").as_int());
   if (!camera)
-    throw std::runtime_error("failed to find first camera");
+    throw std::runtime_error("failed to find camera");
 
   if (camera->acquire())
-    throw std::runtime_error("failed to acquire first camera");
+    throw std::runtime_error("failed to acquire camera");
 
   // configure camera stream
   std::unique_ptr<libcamera::CameraConfiguration> cfg =
