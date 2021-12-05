@@ -98,6 +98,16 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   if (camera_manager.cameras().empty())
     throw std::runtime_error("no cameras available");
 
+  std::cout << ">> cameras:" << std::endl;
+  for (size_t id = 0; id < camera_manager.cameras().size(); id++) {
+    const std::shared_ptr<libcamera::Camera> camera = camera_manager.cameras().at(id);
+    const libcamera::ControlList &properties = camera->properties();
+    const std::string name = properties.contains(libcamera::properties::Model)
+                               ? properties.get(libcamera::properties::Model)
+                               : "UNDEFINED";
+    std::cout << id << ": " << name << " (" << camera->id() << ")" << std::endl;
+  }
+
   // get the camera
   if (size_t(get_parameter("camera").as_int()) >= camera_manager.cameras().size())
     throw std::runtime_error("camera does not exist");
