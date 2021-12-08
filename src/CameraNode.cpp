@@ -234,30 +234,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
               << info.min().type() << ", " << info.max().type() << std::endl;
 
     rclcpp::ParameterValue value;
-
-    rcl_interfaces::msg::ParameterDescriptor param_descr;
     rcl_interfaces::msg::IntegerRange range_int;
     rcl_interfaces::msg::FloatingPointRange range_float;
-
-    switch (info.def().type()) {
-    case libcamera::ControlTypeBool:
-      value = rclcpp::ParameterValue(info.def().get<bool>());
-      break;
-    case libcamera::ControlTypeInteger32:
-      value = rclcpp::ParameterValue(info.def().get<int32_t>());
-      break;
-    case libcamera::ControlTypeInteger64:
-      value = rclcpp::ParameterValue(info.def().get<int64_t>());
-      break;
-    case libcamera::ControlTypeFloat:
-      value = rclcpp::ParameterValue(info.def().get<float>());
-      break;
-    case libcamera::ControlTypeString:
-      value = rclcpp::ParameterValue(info.def().get<std::string>());
-      break;
-    default:
-      break;
-    }
 
     if (info.min().type() != info.max().type())
       throw std::runtime_error(id->name() + " min and max parameter type use different types");
@@ -279,11 +257,35 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
       break;
     }
 
+    switch (info.def().type()) {
+    case libcamera::ControlTypeBool:
+      value = rclcpp::ParameterValue(info.def().get<bool>());
+      break;
+    case libcamera::ControlTypeInteger32:
+      value = rclcpp::ParameterValue(std::min<int32_t>(
+        std::max<int32_t>(range_int.from_value, info.def().get<int32_t>()), range_int.to_value));
+      break;
+    case libcamera::ControlTypeInteger64:
+      value = rclcpp::ParameterValue(std::min<int64_t>(
+        std::max<int64_t>(range_int.from_value, info.def().get<int64_t>()), range_int.to_value));
+      break;
+    case libcamera::ControlTypeFloat:
+      value = rclcpp::ParameterValue(std::min<float>(
+        std::max<float>(range_float.from_value, info.def().get<float>()), range_float.to_value));
+      break;
+    case libcamera::ControlTypeString:
+      value = rclcpp::ParameterValue(info.def().get<std::string>());
+      break;
+    default:
+      break;
+    }
+
     std::cout << id->name() << ": " << rclcpp::to_string(value) << std::endl;
     std::cout << "  (int)   " << range_int.from_value << " .. " << range_int.to_value << std::endl;
     std::cout << "  (float) " << range_float.from_value << " .. " << range_float.to_value
               << std::endl;
 
+    rcl_interfaces::msg::ParameterDescriptor param_descr;
     param_descr.integer_range = {range_int};
     param_descr.floating_point_range = {range_float};
 
