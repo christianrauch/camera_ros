@@ -239,21 +239,35 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
       break;
     case libcamera::ControlTypeInteger32:
       value = rclcpp::ParameterValue(info.def().get<int32_t>());
+      break;
+    case libcamera::ControlTypeInteger64:
+      value = rclcpp::ParameterValue(info.def().get<int64_t>());
+      break;
+    case libcamera::ControlTypeFloat:
+      value = rclcpp::ParameterValue(info.def().get<float>());
+      break;
+    case libcamera::ControlTypeString:
+      value = rclcpp::ParameterValue(info.def().get<std::string>());
+      break;
+    default:
+      break;
+    }
+
+    if (info.min().type() != info.max().type())
+      throw std::runtime_error(id->name() + " min and max parameter type use different types");
+
+    switch (info.min().type()) {
+    case libcamera::ControlTypeInteger32:
       range_int.from_value = info.min().get<int32_t>();
       range_int.to_value = info.max().get<int32_t>();
       break;
     case libcamera::ControlTypeInteger64:
-      value = rclcpp::ParameterValue(info.def().get<int64_t>());
       range_int.from_value = info.min().get<int64_t>();
       range_int.to_value = info.max().get<int64_t>();
       break;
     case libcamera::ControlTypeFloat:
-      value = rclcpp::ParameterValue(info.def().get<float>());
       range_float.from_value = info.min().get<float>();
       range_float.to_value = info.max().get<float>();
-      break;
-    case libcamera::ControlTypeString:
-      value = rclcpp::ParameterValue(info.def().get<std::string>());
       break;
     default:
       break;
