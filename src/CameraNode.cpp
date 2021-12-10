@@ -1,3 +1,4 @@
+#include "control_type_map.hpp"
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <libcamera/camera.h>
@@ -12,6 +13,7 @@
 #include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sys/mman.h>
+#include <variant>
 
 
 namespace camera
@@ -81,6 +83,14 @@ const std::unordered_map<uint32_t, std::string> map_format_raw = {
 const std::unordered_map<uint32_t, std::string> map_format_compressed = {
   {libcamera::formats::MJPEG.fourcc(), "jpeg"},
 };
+
+template<typename T>
+rclcpp::ParameterValue clamp(const std::any &value_source, const std::array<std::any, 2> &val_range)
+{
+  return rclcpp::ParameterValue(
+    std::min<T>(std::max<T>(std::any_cast<T>(val_range[0]), std::any_cast<T>(value_source)),
+                std::any_cast<T>(val_range[1])));
+}
 
 CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options), cim(this)
 {
@@ -227,60 +237,212 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     // store control id with name
     parameter_ids[id->name()] = id;
 
+    //    dynamic_cast<libcamera::Control<> *>(id);
+
     std::cout << "param " << id->name() << ": " << info.toString() << " (" << info.def().type()
               << ")" << std::endl;
 
-    std::cout << "param type " << id->name() << ": " << info.def().type() << ",  "
-              << info.min().type() << ", " << info.max().type() << std::endl;
+    std::cout << "param type " << id->name() << ": " << id->type() << " | " << info.def().type()
+              << ", " << info.min().type() << ", " << info.max().type() << std::endl;
 
     rclcpp::ParameterValue value;
     rcl_interfaces::msg::IntegerRange range_int;
     rcl_interfaces::msg::FloatingPointRange range_float;
 
-    if (info.min().type() != info.max().type())
-      throw std::runtime_error(id->name() + " min and max parameter type use different types");
+    //    if (info.min().type() != info.max().type())
+    //      throw std::runtime_error(id->name() + " min and max parameter use different types");
 
-    switch (info.min().type()) {
-    case libcamera::ControlTypeInteger32:
-      range_int.from_value = info.min().get<int32_t>();
-      range_int.to_value = info.max().get<int32_t>();
-      break;
-    case libcamera::ControlTypeInteger64:
-      range_int.from_value = info.min().get<int64_t>();
-      range_int.to_value = info.max().get<int64_t>();
-      break;
-    case libcamera::ControlTypeFloat:
-      range_float.from_value = info.min().get<float>();
-      range_float.to_value = info.max().get<float>();
-      break;
-    default:
-      break;
-    }
+    std::array<std::any, 2> val_range;
 
-    switch (info.def().type()) {
+    val_range = {convert_type2(info.min() /*, id->type()*/),
+                 convert_type2(info.max() /*, id->type()*/)};
+
+    //    switch (info.min().type()) {
+    //    case libcamera::ControlTypeInteger32:
+    //      range_int.from_value = info.min().get<int32_t>();
+    //      range_int.to_value = info.max().get<int32_t>();
+    //      break;
+    //    case libcamera::ControlTypeInteger64:
+    //      range_int.from_value = info.min().get<int64_t>();
+    //      range_int.to_value = info.max().get<int64_t>();
+    //      break;
+    //    case libcamera::ControlTypeFloat:
+    //      range_float.from_value = info.min().get<float>();
+    //      range_float.to_value = info.max().get<float>();
+    //      break;
+    //    default:
+    //      break;
+    //    }
+
+    // TODO: set parameter type by id->type()
+    // but we still need to get def via info.def().type()
+    // auto-cast from def to id type?
+
+    std::any val_def = convert_type2(info.def() /*, id->type()*/);
+
+    //    if (is_integer(id->type())) {
+    //      range_int.from_value =
+    //        std::any_cast<rcl_interfaces::msg::IntegerRange::_from_value_type>(val_range[0]);
+    //      range_int.to_value =
+    //        std::any_cast<rcl_interfaces::msg::IntegerRange::_to_value_type>(val_range[1]);
+    //    }
+    //    else if (is_float(id->type())) {
+    //      range_float.from_value = std::any_cast<float>(val_range[0]);
+    //      range_float.to_value = std::any_cast<float>(val_range[1]);
+    //    }
+
+    //    switch (info.def().type()) {
+    //    case libcamera::ControlTypeNone:
+    //      break;
+    //    case libcamera::ControlTypeBool:
+    //      val_def = info.def().get<ControlTypeMap<libcamera::ControlTypeBool>::type>();
+    //      break;
+    //    case libcamera::ControlTypeByte:
+    //      val_def = info.def().get<ControlTypeMap<libcamera::ControlTypeByte>::type>();
+    //      break;
+    //    case libcamera::ControlTypeInteger32:
+    //      val_def = info.def().get<ControlTypeMap<libcamera::ControlTypeInteger32>::type>();
+    //      break;
+    //    case libcamera::ControlTypeInteger64:
+    //      val_def = info.def().get<ControlTypeMap<libcamera::ControlTypeInteger64>::type>();
+    //      break;
+    //    case libcamera::ControlTypeFloat:
+    //      val_def = info.def().get<ControlTypeMap<libcamera::ControlTypeFloat>::type>();
+    //      break;
+    //    case libcamera::ControlTypeString:
+    //      val_def = info.def().get<ControlTypeMap<libcamera::ControlTypeString>::type>();
+    //      break;
+    //    case libcamera::ControlTypeRectangle:
+    //      val_def = info.def().get<ControlTypeMap<libcamera::ControlTypeRectangle>::type>();
+    //      break;
+    //    case libcamera::ControlTypeSize:
+    //      val_def = info.def().get<ControlTypeMap<libcamera::ControlTypeSize>::type>();
+    //      break;
+    //    }
+
+    //    switch (info.def().type()) {
+    //    case libcamera::ControlTypeBool:
+    //      val_default = info.def().get<bool>();
+    //      val_def = rclcpp::ParameterValue(info.def().get<bool>());
+    //      break;
+    //    case libcamera::ControlTypeInteger32:
+    //      val_default = info.def().get<int32_t>();
+    //      val_def = rclcpp::ParameterValue(std::min<int32_t>(
+    //        std::max<int32_t>(range_int.from_value, info.def().get<int32_t>()), range_int.to_value));
+    //      break;
+    //    case libcamera::ControlTypeInteger64:
+    //      val_def = rclcpp::ParameterValue(std::min<int64_t>(
+    //        std::max<int64_t>(range_int.from_value, info.def().get<int64_t>()), range_int.to_value));
+    //      break;
+    //    case libcamera::ControlTypeFloat:
+    //      val_def = rclcpp::ParameterValue(std::min<float>(
+    //        std::max<float>(range_float.from_value, info.def().get<float>()), range_float.to_value));
+    //      break;
+    //    case libcamera::ControlTypeString:
+    //      val_def = rclcpp::ParameterValue(info.def().get<std::string>());
+    //      break;
+    //    default:
+    //      break;
+    //    }
+
+
+    //    const std::type_info *T;
+
+
+    //    switch (id->type()) {
+    //    case libcamera::ControlTypeNone:
+    //      break;
+    //    case libcamera::ControlTypeBool:
+    //      T = &typeid(ControlTypeMap<libcamera::ControlTypeBool>::type);
+    //      break;
+    //    case libcamera::ControlTypeByte:
+    //      //      value = value_source.get<ControlTypeMap<libcamera::ControlTypeByte>::type>();
+    //      break;
+    //    case libcamera::ControlTypeInteger32:
+    //      T = &typeid(ControlTypeMap<libcamera::ControlTypeInteger32>::type);
+    //      break;
+    //    case libcamera::ControlTypeInteger64:
+    //      //      value = value_source.get<ControlTypeMap<libcamera::ControlTypeInteger64>::type>();
+    //      break;
+    //    case libcamera::ControlTypeFloat:
+    //      T = &typeid(ControlTypeMap<libcamera::ControlTypeFloat>::type);
+    //      break;
+    //    case libcamera::ControlTypeString:
+    //      //      value = value_source.get<ControlTypeMap<libcamera::ControlTypeString>::type>();
+    //      T = &typeid(ControlTypeMap<libcamera::ControlTypeString>::type);
+    //      break;
+    //    case libcamera::ControlTypeRectangle:
+    //      //      value = value_source.get<ControlTypeMap<libcamera::ControlTypeRectangle>::type>();
+    //      break;
+    //    case libcamera::ControlTypeSize:
+    //      //      value = value_source.get<ControlTypeMap<libcamera::ControlTypeSize>::type>();
+    //      break;
+    //    }
+
+    //    std::cout << "type: " << std::string(T->name()) << std::endl;
+
+    //    switch (id->type()) {
+    //    case libcamera::ControlTypeInteger32:
+    //      range_int.from_value =
+    //        std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(val_range[0]);
+    //      range_int.to_value =
+    //        std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(val_range[1]);
+    //      break;
+    //    case libcamera::ControlTypeInteger64:
+    //      range_int.from_value =
+    //        std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(val_range[0]);
+    //      range_int.to_value =
+    //        std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(val_range[1]);
+    //      break;
+    //    case libcamera::ControlTypeFloat:
+    //      range_float.from_value =
+    //        std::any_cast<ControlTypeMap<libcamera::ControlTypeFloat>::type>(val_range[0]);
+    //      range_float.to_value =
+    //        std::any_cast<ControlTypeMap<libcamera::ControlTypeFloat>::type>(val_range[1]);
+    //      break;
+    //    }
+
+
+    switch (id->type()) {
+    case libcamera::ControlTypeNone:
+      break;
     case libcamera::ControlTypeBool:
-      value = rclcpp::ParameterValue(info.def().get<bool>());
+      value = clamp<ControlTypeMap<libcamera::ControlTypeBool>::type>(val_def, val_range);
+      break;
+    case libcamera::ControlTypeByte:
+      value = clamp<ControlTypeMap<libcamera::ControlTypeByte>::type>(val_def, val_range);
       break;
     case libcamera::ControlTypeInteger32:
-      value = rclcpp::ParameterValue(std::min<int32_t>(
-        std::max<int32_t>(range_int.from_value, info.def().get<int32_t>()), range_int.to_value));
+      range_int.from_value =
+        std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(val_range[0]);
+      range_int.to_value =
+        std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(val_range[1]);
+      value = clamp<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(val_def, val_range);
       break;
     case libcamera::ControlTypeInteger64:
-      value = rclcpp::ParameterValue(std::min<int64_t>(
-        std::max<int64_t>(range_int.from_value, info.def().get<int64_t>()), range_int.to_value));
+      range_int.from_value =
+        std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(val_range[0]);
+      range_int.to_value =
+        std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(val_range[1]);
+      value = clamp<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(val_def, val_range);
       break;
     case libcamera::ControlTypeFloat:
-      value = rclcpp::ParameterValue(std::min<float>(
-        std::max<float>(range_float.from_value, info.def().get<float>()), range_float.to_value));
+      range_float.from_value =
+        std::any_cast<ControlTypeMap<libcamera::ControlTypeFloat>::type>(val_range[0]);
+      range_float.to_value =
+        std::any_cast<ControlTypeMap<libcamera::ControlTypeFloat>::type>(val_range[1]);
+      value = clamp<ControlTypeMap<libcamera::ControlTypeFloat>::type>(val_def, val_range);
       break;
     case libcamera::ControlTypeString:
-      value = rclcpp::ParameterValue(info.def().get<std::string>());
+      value = clamp<ControlTypeMap<libcamera::ControlTypeString>::type>(val_def, val_range);
       break;
-    default:
+    case libcamera::ControlTypeRectangle:
+    case libcamera::ControlTypeSize:
       break;
     }
 
-    std::cout << id->name() << ": " << rclcpp::to_string(value) << std::endl;
+    std::cout << id->name() << ": " << rclcpp::to_string(value) << " (t: " << value.get_type()
+              << ")" << std::endl;
     std::cout << "  (int)   " << range_int.from_value << " .. " << range_int.to_value << std::endl;
     std::cout << "  (float) " << range_float.from_value << " .. " << range_float.to_value
               << std::endl;
@@ -442,6 +604,9 @@ rcl_interfaces::msg::SetParametersResult
 CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
 {
   for (const rclcpp::Parameter &parameter : parameters) {
+    std::cout << "set " << parameter.get_name() << ": " << parameter.value_to_string() << " ("
+              << parameter.get_type_name() << ")" << std::endl;
+
     if (parameter_ids.count(parameter.get_name())) {
       libcamera::ControlValue value;
       const libcamera::ControlType &type = parameter_ids.at(parameter.get_name())->type();
@@ -457,7 +622,7 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
         else if (type == libcamera::ControlTypeInteger64)
           value.set(int64_t(parameter.as_int()));
         else
-          throw std::runtime_error("invalid type");
+          throw std::runtime_error("invalid integer type: " + std::to_string(type));
         break;
       case rclcpp::ParameterType::PARAMETER_DOUBLE:
         value.set(float(parameter.as_double()));
