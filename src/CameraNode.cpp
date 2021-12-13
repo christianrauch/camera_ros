@@ -469,14 +469,14 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
         break;
       case rclcpp::ParameterType::PARAMETER_INTEGER:
         if (type == libcamera::ControlTypeInteger32)
-          value.set(int32_t(parameter.as_int()));
+          value.set(CTInteger32(parameter.as_int()));
         else if (type == libcamera::ControlTypeInteger64)
-          value.set(int64_t(parameter.as_int()));
+          value.set(CTInteger64(parameter.as_int()));
         else
           throw std::runtime_error("invalid integer type: " + std::to_string(type));
         break;
       case rclcpp::ParameterType::PARAMETER_DOUBLE:
-        value.set(float(parameter.as_double()));
+        value.set(CTFloat(parameter.as_double()));
         break;
       case rclcpp::ParameterType::PARAMETER_STRING:
         value.set(parameter.as_string());
