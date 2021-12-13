@@ -3,6 +3,7 @@
 #include <libcamera/controls.h>
 #include <libcamera/geometry.h>
 //#include <variant>
+#include <sstream>
 
 //bool is_integer(const libcamera::ControlType &type)
 //{
@@ -164,6 +165,20 @@ CTString convert(const CTFloat &value)
 }
 
 // from ControlTypeString
+
+template<>
+CTBool convert(const CTString &value)
+{
+  bool v;
+  std::istringstream vss(value);
+
+  vss >> std::boolalpha >> v;
+
+  if (vss.fail())
+    throw std::invalid_argument("invalid string representation for boolean: '" + value + "'");
+
+  return v;
+}
 
 template<>
 CTByte convert(const CTString &value)
