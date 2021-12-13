@@ -313,7 +313,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   }
 
   // set initial parameters
-  onParameterChange(parameters_initial);
+  //  onParameterChange(parameters_initial);
 
   // register callback to handle parameter changes
   callback_parameter_change = add_on_set_parameters_callback(
