@@ -2,18 +2,7 @@
 #include <any>
 #include <libcamera/controls.h>
 #include <libcamera/geometry.h>
-//#include <variant>
 #include <sstream>
-
-//bool is_integer(const libcamera::ControlType &type)
-//{
-//  return (type == libcamera::ControlTypeInteger32) || (type == libcamera::ControlTypeInteger64);
-//}
-
-//bool is_float(const libcamera::ControlType &type)
-//{
-//  return (type == libcamera::ControlTypeFloat);
-//}
 
 
 // map 'ControlType' enums to C++ types
@@ -241,49 +230,3 @@ std::any cast_type(const std::any &value)
 
   return value;
 }
-
-//ControlTypeMap<libcamera::ControlTypeByte>::type & ::operator=(
-//  const ControlTypeMap<libcamera::ControlTypeRectangle>::type &other)
-//{
-//  //
-//}
-
-//operator ControlTypeMap<libcamera::ControlTypeByte>::type(
-//  const ControlTypeMap<libcamera::ControlTypeRectangle>::type &other)
-//{
-//  //
-//}
-
-//template<ControlTypeMap<libcamera::ControlTypeByte>::type>
-//bool cast_type(std::any &value)
-//{
-//  if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeNone>::type)) {
-//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeNone>::type>(value));
-//  }
-//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeBool>::type)) {
-//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeBool>::type>(value));
-//  }
-//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeByte>::type)) {
-//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeByte>::type>(value));
-//  }
-//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeInteger32>::type)) {
-//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(value));
-//  }
-//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeInteger64>::type)) {
-//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(value));
-//  }
-//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeFloat>::type)) {
-//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeFloat>::type>(value));
-//  }
-//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeString>::type)) {
-//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeString>::type>(value));
-//  }
-//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeRectangle>::type)) {
-//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeRectangle>::type>(value));
-//  }
-//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeSize>::type)) {
-//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeSize>::type>(value));
-//  }
-
-//  return true;
-//}

@@ -87,8 +87,6 @@ const std::unordered_map<uint32_t, std::string> map_format_compressed = {
 template<typename T>
 rclcpp::ParameterValue clamp(const std::any &value_source, const std::array<std::any, 2> &val_range)
 {
-  std::cout << value_source.type().name() << " -> " << typeid(T).name() << std::endl;
-
   return rclcpp::ParameterValue(
     std::min<T>(std::max<T>(std::any_cast<T>(cast_type<T>(val_range[0])),
                             std::any_cast<T>(cast_type<T>(value_source))),
@@ -240,15 +238,21 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     // store control id with name
     parameter_ids[id->name()] = id;
 
-    //    dynamic_cast<libcamera::Control<> *>(id);
+    std::cout << "param " << id->name() << ": " << info.toString() << " (" << info.def().toString()
+              << ") (" << id->type() << ")" << std::endl;
+    std::cout << "  values: " << info.values().size() << std::endl;
+    std::cout << "  sp def: " << info.def().data().size() << std::endl;
+    std::cout << "  sp min: " << info.min().data().size() << std::endl;
+    std::cout << "  sp max: " << info.max().data().size() << std::endl;
+    std::cout << "  array def: " << info.def().isArray() << " (" << info.def().numElements() << ")"
+              << std::endl;
+    std::cout << "  array min: " << info.min().isArray() << " (" << info.min().numElements() << ")"
+              << std::endl;
+    std::cout << "  array max: " << info.max().isArray() << " (" << info.max().numElements() << ")"
+              << std::endl;
 
-    //    const bool has_limit = (info.min() != info.max());
-
-    std::cout << "param " << id->name() << ": " << info.toString() << " (" << info.def().type()
-              << ")" << std::endl;
-
-    std::cout << "param type " << id->name() << ": " << id->type() << " | " << info.def().type()
-              << ", " << info.min().type() << ", " << info.max().type() << std::endl;
+    //    std::cout << "param type " << id->name() << ": " << id->type() << " | " << info.def().type()
+    //              << ", " << info.min().type() << ", " << info.max().type() << std::endl;
 
     rclcpp::ParameterValue value;
     rcl_interfaces::msg::IntegerRange range_int;
@@ -268,16 +272,19 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
       value = clamp<CTByte>(val_def, val_range);
       break;
     case libcamera::ControlTypeInteger32:
+      //      std::cout << "span? " << libcamera::details::is_span<CTInteger32>::value << std::endl;
       range_int.from_value = std::any_cast<CTInteger32>(val_range[0]);
       range_int.to_value = std::any_cast<CTInteger32>(val_range[1]);
       value = clamp<CTInteger32>(val_def, val_range);
       break;
     case libcamera::ControlTypeInteger64:
+      //      std::cout << "span? " << libcamera::details::is_span<CTInteger32>::value << std::endl;
       range_int.from_value = std::any_cast<CTInteger64>(val_range[0]);
       range_int.to_value = std::any_cast<CTInteger64>(val_range[1]);
       value = clamp<CTInteger64>(val_def, val_range);
       break;
     case libcamera::ControlTypeFloat:
+      //      std::cout << "span? " << libcamera::details::is_span<CTInteger32>::value << std::endl;
       range_float.from_value = std::any_cast<CTFloat>(val_range[0]);
       range_float.to_value = std::any_cast<CTFloat>(val_range[1]);
       value = clamp<CTFloat>(val_def, val_range);
@@ -286,15 +293,20 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
       value = clamp<CTString>(val_def, val_range);
       break;
     case libcamera::ControlTypeRectangle:
+      // TODO: 4D array
+      //      value = clamp<CTRectangle>(val_def, val_range);
+      break;
     case libcamera::ControlTypeSize:
+      // TODO: 2D array
+      //      value = clamp<CTSize>(val_def, val_range);
       break;
     }
 
-    std::cout << id->name() << ": " << rclcpp::to_string(value) << " (t: " << value.get_type()
-              << ")" << std::endl;
-    std::cout << "  (int)   " << range_int.from_value << " .. " << range_int.to_value << std::endl;
-    std::cout << "  (float) " << range_float.from_value << " .. " << range_float.to_value
-              << std::endl;
+    //    std::cout << id->name() << ": " << rclcpp::to_string(value) << " (t: " << value.get_type()
+    //              << ")" << std::endl;
+    //    std::cout << "  (int)   " << range_int.from_value << " .. " << range_int.to_value << std::endl;
+    //    std::cout << "  (float) " << range_float.from_value << " .. " << range_float.to_value
+    //              << std::endl;
 
     rcl_interfaces::msg::ParameterDescriptor param_descr;
     if (range_int.from_value != range_int.to_value)
@@ -302,18 +314,35 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     if (range_float.from_value != range_float.to_value)
       param_descr.floating_point_range = {range_float};
 
-    if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET) {
+    std::set<unsigned int> ignore {
+      // interfers with AeEnable
+      libcamera::controls::ExposureTime.id(),
+    };
+
+    // ignore 'Span' types
+    static const std::set<unsigned int> ignore_span {
+      libcamera::controls::ColourGains.id(),
+      libcamera::controls::SensorBlackLevels.id(),
+      libcamera::controls::ColourCorrectionMatrix.id(),
+      libcamera::controls::FrameDurationLimits.id(),
+    };
+
+    if (ignore_span.count(id->id())) {
+      RCLCPP_ERROR_STREAM(get_logger(), "unsupported Span type: " << id->name());
+    }
+    else if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET) {
       declare_parameter(id->name(), value, param_descr);
       // setting the ExposureTime parameter right at the beginning causes:
       //   ERROR V4L2 [...]: Unable to set controls: Invalid argument
       //   ERROR UVC [...] Failed to set controls: -22
-      if (id->id() != libcamera::controls::ExposureTime.id())
+      if (!ignore.count(id->id()))
         parameters_initial.push_back(get_parameter(id->name()));
     }
   }
 
   // set initial parameters
-  //  onParameterChange(parameters_initial);
+  // TODO: find conflicting parameters
+  onParameterChange(parameters_initial);
 
   // register callback to handle parameter changes
   callback_parameter_change = add_on_set_parameters_callback(
