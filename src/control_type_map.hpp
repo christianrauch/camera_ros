@@ -4,15 +4,15 @@
 #include <libcamera/geometry.h>
 //#include <variant>
 
-bool is_integer(const libcamera::ControlType &type)
-{
-  return (type == libcamera::ControlTypeInteger32) || (type == libcamera::ControlTypeInteger64);
-}
+//bool is_integer(const libcamera::ControlType &type)
+//{
+//  return (type == libcamera::ControlTypeInteger32) || (type == libcamera::ControlTypeInteger64);
+//}
 
-bool is_float(const libcamera::ControlType &type)
-{
-  return (type == libcamera::ControlTypeFloat);
-}
+//bool is_float(const libcamera::ControlType &type)
+//{
+//  return (type == libcamera::ControlTypeFloat);
+//}
 
 
 // map 'ControlType' enums to C++ types
@@ -74,131 +74,201 @@ struct ControlTypeMap<libcamera::ControlTypeSize>
   using type = libcamera::Size;
 };
 
+typedef ControlTypeMap<libcamera::ControlTypeNone>::type CTNone;
+typedef ControlTypeMap<libcamera::ControlTypeBool>::type CTBool;
+typedef ControlTypeMap<libcamera::ControlTypeByte>::type CTByte;
+typedef ControlTypeMap<libcamera::ControlTypeInteger32>::type CTInteger32;
+typedef ControlTypeMap<libcamera::ControlTypeInteger64>::type CTInteger64;
+typedef ControlTypeMap<libcamera::ControlTypeFloat>::type CTFloat;
+typedef ControlTypeMap<libcamera::ControlTypeString>::type CTString;
+typedef ControlTypeMap<libcamera::ControlTypeRectangle>::type CTRectangle;
+typedef ControlTypeMap<libcamera::ControlTypeSize>::type CTSize;
 
-/**
- * @brief variant with all possible converted types
- */
-//typedef std::variant<bool, uint8_t, int32_t, int64_t, float, std::string, libcamera::Rectangle,
-//                     libcamera::Size>
-//  control_type_variant;
-
-/**
- * @brief convert a control value to given type
- * @param value_source source value
- * @param type_target target type
- * @return std::variant
- */
-//control_type_variant
-//convert_type(const libcamera::ControlValue &value_source,
-//             const libcamera::ControlType &type_target = libcamera::ControlTypeNone)
-//{
-//  control_type_variant value;
-
-//  switch (value_source.type()) {
-//  case libcamera::ControlTypeNone:
-//    break;
-//  case libcamera::ControlTypeBool:
-//    value = value_source.get<ControlTypeMap<libcamera::ControlTypeBool>::type>();
-//    break;
-//  case libcamera::ControlTypeByte:
-//    value = value_source.get<ControlTypeMap<libcamera::ControlTypeByte>::type>();
-//    break;
-//  case libcamera::ControlTypeInteger32:
-//    value = value_source.get<ControlTypeMap<libcamera::ControlTypeInteger32>::type>();
-//    break;
-//  case libcamera::ControlTypeInteger64:
-//    value = value_source.get<ControlTypeMap<libcamera::ControlTypeInteger64>::type>();
-//    break;
-//  case libcamera::ControlTypeFloat:
-//    value = value_source.get<ControlTypeMap<libcamera::ControlTypeFloat>::type>();
-//    break;
-//  case libcamera::ControlTypeString:
-//    value = value_source.get<ControlTypeMap<libcamera::ControlTypeString>::type>();
-//    break;
-//  case libcamera::ControlTypeRectangle:
-//    value = value_source.get<ControlTypeMap<libcamera::ControlTypeRectangle>::type>();
-//    break;
-//  case libcamera::ControlTypeSize:
-//    value = value_source.get<ControlTypeMap<libcamera::ControlTypeSize>::type>();
-//    break;
-//  }
-
-//  switch (type_target) {
-//  case libcamera::ControlTypeNone:
-//    return value;
-//  case libcamera::ControlTypeBool:
-//    return std::get<ControlTypeMap<libcamera::ControlTypeBool>::type>(value);
-//  case libcamera::ControlTypeByte:
-//    return std::get<ControlTypeMap<libcamera::ControlTypeByte>::type>(value);
-//  case libcamera::ControlTypeInteger32:
-//    return std::get<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(value);
-//  case libcamera::ControlTypeInteger64:
-//    return std::get<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(value);
-//  case libcamera::ControlTypeFloat:
-//    return std::get<ControlTypeMap<libcamera::ControlTypeFloat>::type>(value);
-//  case libcamera::ControlTypeString:
-//    return std::get<ControlTypeMap<libcamera::ControlTypeString>::type>(value);
-//  case libcamera::ControlTypeRectangle:
-//    return std::get<ControlTypeMap<libcamera::ControlTypeRectangle>::type>(value);
-//  case libcamera::ControlTypeSize:
-//    return std::get<ControlTypeMap<libcamera::ControlTypeSize>::type>(value);
-//  }
-//}
-
-std::any convert_type2(const libcamera::ControlValue &value_source/*,
-                       const libcamera::ControlType &type_target = libcamera::ControlTypeNone*/)
+std::any convert_type(const libcamera::ControlValue &value_source)
 {
-  std::any value;
-
   switch (value_source.type()) {
   case libcamera::ControlTypeNone:
     break;
   case libcamera::ControlTypeBool:
-    value = value_source.get<ControlTypeMap<libcamera::ControlTypeBool>::type>();
+    return value_source.get<CTBool>();
     break;
   case libcamera::ControlTypeByte:
-    value = value_source.get<ControlTypeMap<libcamera::ControlTypeByte>::type>();
+    return value_source.get<CTByte>();
     break;
   case libcamera::ControlTypeInteger32:
-    value = value_source.get<ControlTypeMap<libcamera::ControlTypeInteger32>::type>();
+    return value_source.get<CTInteger32>();
     break;
   case libcamera::ControlTypeInteger64:
-    value = value_source.get<ControlTypeMap<libcamera::ControlTypeInteger64>::type>();
+    return value_source.get<CTInteger64>();
     break;
   case libcamera::ControlTypeFloat:
-    value = value_source.get<ControlTypeMap<libcamera::ControlTypeFloat>::type>();
+    return value_source.get<CTFloat>();
     break;
   case libcamera::ControlTypeString:
-    value = value_source.get<ControlTypeMap<libcamera::ControlTypeString>::type>();
+    return value_source.get<CTString>();
     break;
   case libcamera::ControlTypeRectangle:
-    value = value_source.get<ControlTypeMap<libcamera::ControlTypeRectangle>::type>();
+    return value_source.get<CTRectangle>();
     break;
   case libcamera::ControlTypeSize:
-    value = value_source.get<ControlTypeMap<libcamera::ControlTypeSize>::type>();
+    return value_source.get<CTSize>();
     break;
   }
+  return {};
+}
+
+template<typename T, typename F>
+T convert(const F &value)
+{
+  return T(value);
+}
+
+// from ControlTypeBool
+
+template<>
+CTString convert(const CTBool &value)
+{
+  return std::to_string(value);
+}
+
+// from ControlTypeByte
+
+template<>
+CTString convert(const CTByte &value)
+{
+  return std::to_string(value);
+}
+
+// from ControlTypeInteger32
+
+template<>
+CTString convert(const CTInteger32 &value)
+{
+  return std::to_string(value);
+}
+
+// from ControlTypeInteger64
+
+template<>
+CTString convert(const CTInteger64 &value)
+{
+  return std::to_string(value);
+}
+
+// from ControlTypeFloat
+
+template<>
+CTString convert(const CTFloat &value)
+{
+  return std::to_string(value);
+}
+
+// from ControlTypeString
+
+template<>
+CTByte convert(const CTString &value)
+{
+  return std::stoi(value);
+}
+
+template<>
+CTInteger32 convert(const CTString &value)
+{
+  // long int
+  return std::stol(value);
+}
+
+template<>
+CTInteger64 convert(const CTString &value)
+{
+  // long long int
+  return std::stoll(value);
+}
+
+template<>
+CTFloat convert(const CTString &value)
+{
+  return std::stof(value);
+}
+
+template<typename T, typename F>
+T convert_any(const std::any &value)
+{
+  return convert<T, F>(std::any_cast<F>(value));
+}
+
+template<typename T>
+std::any cast_type(const std::any &value)
+{
+  if (typeid(T) == value.type())
+    return value;
+
+  if (value.type() == typeid(CTNone))
+    return {};
+  else if (value.type() == typeid(CTBool))
+    return convert_any<T, CTBool>(value);
+  else if (value.type() == typeid(CTByte))
+    return convert_any<T, CTByte>(value);
+  else if (value.type() == typeid(CTInteger32))
+    return convert_any<T, CTInteger32>(value);
+  else if (value.type() == typeid(CTInteger64))
+    return convert_any<T, CTInteger64>(value);
+  else if (value.type() == typeid(CTFloat))
+    return convert_any<T, CTFloat>(value);
+  else if (value.type() == typeid(CTString))
+    return convert_any<T, CTString>(value);
+  else if (value.type() == typeid(CTRectangle))
+    return {};
+  else if (value.type() == typeid(CTSize))
+    return {};
+  else
+    return {};
 
   return value;
-
-  //  switch (type_target) {
-  //  case libcamera::ControlTypeNone:
-  //    return value;
-  //  case libcamera::ControlTypeBool:
-  //    return std::any_cast<ControlTypeMap<libcamera::ControlTypeBool>::type>(value);
-  //  case libcamera::ControlTypeByte:
-  //    return std::any_cast<ControlTypeMap<libcamera::ControlTypeByte>::type>(value);
-  //  case libcamera::ControlTypeInteger32:
-  //    return std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(value);
-  //  case libcamera::ControlTypeInteger64:
-  //    return std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(value);
-  //  case libcamera::ControlTypeFloat:
-  //    return std::any_cast<ControlTypeMap<libcamera::ControlTypeFloat>::type>(value);
-  //  case libcamera::ControlTypeString:
-  //    return std::any_cast<ControlTypeMap<libcamera::ControlTypeString>::type>(value);
-  //  case libcamera::ControlTypeRectangle:
-  //    return std::any_cast<ControlTypeMap<libcamera::ControlTypeRectangle>::type>(value);
-  //  case libcamera::ControlTypeSize:;
-  //    return std::any_cast<ControlTypeMap<libcamera::ControlTypeSize>::type>(value);
-  //  }
 }
+
+//ControlTypeMap<libcamera::ControlTypeByte>::type & ::operator=(
+//  const ControlTypeMap<libcamera::ControlTypeRectangle>::type &other)
+//{
+//  //
+//}
+
+//operator ControlTypeMap<libcamera::ControlTypeByte>::type(
+//  const ControlTypeMap<libcamera::ControlTypeRectangle>::type &other)
+//{
+//  //
+//}
+
+//template<ControlTypeMap<libcamera::ControlTypeByte>::type>
+//bool cast_type(std::any &value)
+//{
+//  if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeNone>::type)) {
+//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeNone>::type>(value));
+//  }
+//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeBool>::type)) {
+//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeBool>::type>(value));
+//  }
+//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeByte>::type)) {
+//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeByte>::type>(value));
+//  }
+//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeInteger32>::type)) {
+//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(value));
+//  }
+//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeInteger64>::type)) {
+//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(value));
+//  }
+//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeFloat>::type)) {
+//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeFloat>::type>(value));
+//  }
+//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeString>::type)) {
+//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeString>::type>(value));
+//  }
+//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeRectangle>::type)) {
+//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeRectangle>::type>(value));
+//  }
+//  else if (value.type() == typeid(ControlTypeMap<libcamera::ControlTypeSize>::type)) {
+//    value = T(std::any_cast<ControlTypeMap<libcamera::ControlTypeSize>::type>(value));
+//  }
+
+//  return true;
+//}
