@@ -521,6 +521,29 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
       if (!value.isNone()) {
         parameters_lock.lock();
         this->parameters.set(parameter_ids.at(parameter.get_name())->id(), value);
+        //        libcamera::ControlValidator val;
+        //        libcamera::controls::controls;
+        // TODO: use 'ControlValidator' for ControlList parameters ?
+
+        // exposure -> disable AE
+        if (parameter_ids.at(parameter.get_name())->id() ==
+              libcamera::controls::ExposureTime.id() &&
+            this->parameters.contains(libcamera::controls::AeEnable) &&
+            this->parameters.get(libcamera::controls::AeEnable))
+        {
+          this->parameters.set(libcamera::controls::AeEnable, false);
+        }
+
+        // AE -> remove exposure
+        if (parameter_ids.at(parameter.get_name())->id() == libcamera::controls::AeEnable.id() &&
+            parameter.as_bool() && this->parameters.contains(libcamera::controls::ExposureTime))
+        {
+          // TODO: remove exposure
+          //          this->parameters.idMap()->at(libcamera::controls::ExposureTime.id());
+          //          this->parameters = libcamera::controls::controls; // ??
+          //          this->parameters.set(libcamera::controls::ExposureTime, int32_t {});
+        }
+
         parameters_lock.unlock();
       }
     }
