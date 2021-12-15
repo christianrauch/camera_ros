@@ -259,92 +259,94 @@ CameraNode::~CameraNode()
 void
 CameraNode::requestComplete(libcamera::Request *request)
 {
-  if (request->status() == libcamera::Request::RequestCancelled)
-    return;
+  if (request->status() == libcamera::Request::RequestComplete) {
+    assert(request->buffers().size() == 1);
 
-  assert(request->buffers().size() == 1);
+    // get the stream and buffer from the request
+    const libcamera::Stream *stream;
+    libcamera::FrameBuffer *buffer;
+    std::tie(stream, buffer) = *request->buffers().begin();
 
-  // get the stream and buffer from the request
-  const libcamera::Stream *stream;
-  libcamera::FrameBuffer *buffer;
-  std::tie(stream, buffer) = *request->buffers().begin();
+    const libcamera::FrameMetadata &metadata = buffer->metadata();
 
-  const libcamera::FrameMetadata &metadata = buffer->metadata();
+    // set time offset once for accurate timing using the device time
+    if (time_offset == 0)
+      time_offset = this->now().nanoseconds() - metadata.timestamp;
 
-  // set time offset once for accurate timing using the device time
-  if (time_offset == 0)
-    time_offset = this->now().nanoseconds() - metadata.timestamp;
+    // memory-map the frame buffer planes
+    assert(buffer->planes().size() == metadata.planes().size());
+    std::vector<buffer_t> buffers;
+    for (size_t i = 0; i < buffer->planes().size(); i++) {
+      buffer_t mem;
+      mem.size = metadata.planes()[i].bytesused;
+      mem.data =
+        mmap(NULL, mem.size, PROT_READ | PROT_WRITE, MAP_SHARED, buffer->planes()[i].fd.get(), 0);
+      buffers.push_back(mem);
+      if (mem.data == MAP_FAILED)
+        std::cerr << "mmap failed: " << std::strerror(errno) << std::endl;
+    }
 
-  // memory-map the frame buffer planes
-  assert(buffer->planes().size() == metadata.planes().size());
-  std::vector<buffer_t> buffers;
-  for (size_t i = 0; i < buffer->planes().size(); i++) {
-    buffer_t mem;
-    mem.size = metadata.planes()[i].bytesused;
-    mem.data =
-      mmap(NULL, mem.size, PROT_READ | PROT_WRITE, MAP_SHARED, buffer->planes()[i].fd.get(), 0);
-    buffers.push_back(mem);
-    if (mem.data == MAP_FAILED)
-      std::cerr << "mmap failed: " << std::strerror(errno) << std::endl;
+    // send image data
+    std_msgs::msg::Header hdr;
+    hdr.stamp = rclcpp::Time(time_offset + int64_t(metadata.timestamp));
+    hdr.frame_id = "camera";
+    const libcamera::StreamConfiguration &cfg = stream->configuration();
+
+    if (map_format_raw.count(cfg.pixelFormat.fourcc())) {
+      // raw uncompressed image
+      assert(buffers.size() == 1);
+      sensor_msgs::msg::Image::UniquePtr msg_img;
+      msg_img = std::make_unique<sensor_msgs::msg::Image>();
+      msg_img->header = hdr;
+      msg_img->width = cfg.size.width;
+      msg_img->height = cfg.size.height;
+      msg_img->step = cfg.stride;
+      msg_img->encoding = map_format_raw.at(cfg.pixelFormat.fourcc());
+      msg_img->data.resize(buffers[0].size);
+      memcpy(msg_img->data.data(), buffers[0].data, buffers[0].size);
+
+      // compress to jpeg
+      sensor_msgs::msg::CompressedImage::UniquePtr msg_img_compressed;
+      msg_img_compressed = std::make_unique<sensor_msgs::msg::CompressedImage>();
+      cv_bridge::toCvCopy(*msg_img)->toCompressedImageMsg(*msg_img_compressed);
+
+      pub_image->publish(std::move(msg_img));
+      pub_image_compressed->publish(std::move(msg_img_compressed));
+    }
+    else if (map_format_compressed.count(cfg.pixelFormat.fourcc())) {
+      // compressed image
+      assert(buffers.size() == 1);
+      sensor_msgs::msg::CompressedImage::UniquePtr msg_img_compressed;
+      msg_img_compressed = std::make_unique<sensor_msgs::msg::CompressedImage>();
+      msg_img_compressed->header = hdr;
+      msg_img_compressed->format = map_format_compressed.at(cfg.pixelFormat.fourcc());
+      msg_img_compressed->data.resize(buffers[0].size);
+      memcpy(msg_img_compressed->data.data(), buffers[0].data, buffers[0].size);
+
+      // decompress into raw rgb8 image
+      sensor_msgs::msg::Image::UniquePtr msg_img;
+      msg_img = std::make_unique<sensor_msgs::msg::Image>();
+      cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
+
+      pub_image->publish(std::move(msg_img));
+      pub_image_compressed->publish(std::move(msg_img_compressed));
+    }
+    else {
+      throw std::runtime_error("unsupported pixel format: " +
+                               stream->configuration().pixelFormat.toString());
+    }
+
+    for (const buffer_t &mem : buffers)
+      if (munmap(mem.data, mem.size) == -1)
+        std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
+
+    sensor_msgs::msg::CameraInfo ci = cim.getCameraInfo();
+    ci.header = hdr;
+    pub_ci->publish(ci);
   }
-
-  // send image data
-  std_msgs::msg::Header hdr;
-  hdr.stamp = rclcpp::Time(time_offset + int64_t(metadata.timestamp));
-  hdr.frame_id = "camera";
-  const libcamera::StreamConfiguration &cfg = stream->configuration();
-
-  if (map_format_raw.count(cfg.pixelFormat.fourcc())) {
-    // raw uncompressed image
-    assert(buffers.size() == 1);
-    sensor_msgs::msg::Image::UniquePtr msg_img;
-    msg_img = std::make_unique<sensor_msgs::msg::Image>();
-    msg_img->header = hdr;
-    msg_img->width = cfg.size.width;
-    msg_img->height = cfg.size.height;
-    msg_img->step = cfg.stride;
-    msg_img->encoding = map_format_raw.at(cfg.pixelFormat.fourcc());
-    msg_img->data.resize(buffers[0].size);
-    memcpy(msg_img->data.data(), buffers[0].data, buffers[0].size);
-
-    // compress to jpeg
-    sensor_msgs::msg::CompressedImage::UniquePtr msg_img_compressed;
-    msg_img_compressed = std::make_unique<sensor_msgs::msg::CompressedImage>();
-    cv_bridge::toCvCopy(*msg_img)->toCompressedImageMsg(*msg_img_compressed);
-
-    pub_image->publish(std::move(msg_img));
-    pub_image_compressed->publish(std::move(msg_img_compressed));
+  else if (request->status() == libcamera::Request::RequestCancelled) {
+    RCLCPP_ERROR_STREAM(get_logger(), "request '" << request->toString() << "' cancelled");
   }
-  else if (map_format_compressed.count(cfg.pixelFormat.fourcc())) {
-    // compressed image
-    assert(buffers.size() == 1);
-    sensor_msgs::msg::CompressedImage::UniquePtr msg_img_compressed;
-    msg_img_compressed = std::make_unique<sensor_msgs::msg::CompressedImage>();
-    msg_img_compressed->header = hdr;
-    msg_img_compressed->format = map_format_compressed.at(cfg.pixelFormat.fourcc());
-    msg_img_compressed->data.resize(buffers[0].size);
-    memcpy(msg_img_compressed->data.data(), buffers[0].data, buffers[0].size);
-
-    // decompress into raw rgb8 image
-    sensor_msgs::msg::Image::UniquePtr msg_img;
-    msg_img = std::make_unique<sensor_msgs::msg::Image>();
-    cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
-
-    pub_image->publish(std::move(msg_img));
-    pub_image_compressed->publish(std::move(msg_img_compressed));
-  }
-  else {
-    throw std::runtime_error("unsupported pixel format: " +
-                             stream->configuration().pixelFormat.toString());
-  }
-
-  for (const buffer_t &mem : buffers)
-    if (munmap(mem.data, mem.size) == -1)
-      std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
-
-  sensor_msgs::msg::CameraInfo ci = cim.getCameraInfo();
-  ci.header = hdr;
-  pub_ci->publish(ci);
 
   // queue the request again for the next frame
   request->reuse(libcamera::Request::ReuseBuffers);
