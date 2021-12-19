@@ -3,7 +3,7 @@
 <package format="3">
   <name>camera_ros</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>node for libcamera supported cameras (V4L2, Raspberry Pi Camera Modules)</description>
   <maintainer email="Rauch.Christian@gmx.de">Christian Rauch</maintainer>
   <license>MIT</license>
 
