@@ -227,6 +227,12 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     // store control id with name
     parameter_ids[id->name()] = id;
 
+    std::cout << "param " << id->name() << ": " << info.toString() << " (" << info.def().type()
+              << ")" << std::endl;
+
+    std::cout << "param type " << id->name() << ": " << info.def().type() << ",  "
+              << info.min().type() << ", " << info.max().type() << std::endl;
+
     rclcpp::ParameterValue value;
 
     rcl_interfaces::msg::ParameterDescriptor param_descr;
@@ -272,6 +278,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     default:
       break;
     }
+
+    std::cout << id->name() << ": " << rclcpp::to_string(value) << std::endl;
+    std::cout << "  (int)   " << range_int.from_value << " .. " << range_int.to_value << std::endl;
+    std::cout << "  (float) " << range_float.from_value << " .. " << range_float.to_value
+              << std::endl;
 
     param_descr.integer_range = {range_int};
     param_descr.floating_point_range = {range_float};
