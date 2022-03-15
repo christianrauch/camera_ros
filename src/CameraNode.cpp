@@ -262,8 +262,14 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     param_descr.integer_range = {range_int};
     param_descr.floating_point_range = {range_float};
 
-    if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET)
+    if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET) {
       declare_parameter(id->name(), value, param_descr);
+      // setting the ExposureTime parameter right at the beginning causes:
+      //   ERROR V4L2 [...]: Unable to set controls: Invalid argument
+      //   ERROR UVC [...] Failed to set controls: -22
+      if (id->id() != libcamera::controls::ExposureTime.id())
+        parameters_initial.push_back(get_parameter(id->name()));
+    }
   }
 
   // set initial parameters
