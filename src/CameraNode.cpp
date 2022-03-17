@@ -320,17 +320,18 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     };
 
     // ignore 'Span' types
-    static const std::set<unsigned int> ignore_span {
-      libcamera::controls::ColourGains.id(),
-      libcamera::controls::SensorBlackLevels.id(),
-      libcamera::controls::ColourCorrectionMatrix.id(),
-      libcamera::controls::FrameDurationLimits.id(),
-    };
+    //    static const std::set<unsigned int> ignore_span {
+    //      libcamera::controls::ColourGains.id(),
+    //      libcamera::controls::SensorBlackLevels.id(),
+    //      libcamera::controls::ColourCorrectionMatrix.id(),
+    //      libcamera::controls::FrameDurationLimits.id(),
+    //    };
 
-    if (ignore_span.count(id->id())) {
+    /*if (ignore_span.count(id->id())) {
       RCLCPP_ERROR_STREAM(get_logger(), "unsupported Span type: " << id->name());
     }
-    else if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET) {
+    else */
+    if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET) {
       declare_parameter(id->name(), value, param_descr);
       // setting the ExposureTime parameter right at the beginning causes:
       //   ERROR V4L2 [...]: Unable to set controls: Invalid argument
