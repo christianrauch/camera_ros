@@ -76,33 +76,49 @@ typedef ControlTypeMap<libcamera::ControlTypeSize>::type CTSize;
 
 std::any convert_type(const libcamera::ControlValue &value_source)
 {
-  switch (value_source.type()) {
-  case libcamera::ControlTypeNone:
-    break;
-  case libcamera::ControlTypeBool:
-    return value_source.get<CTBool>();
-    break;
-  case libcamera::ControlTypeByte:
-    return value_source.get<CTByte>();
-    break;
-  case libcamera::ControlTypeInteger32:
-    return value_source.get<CTInteger32>();
-    break;
-  case libcamera::ControlTypeInteger64:
-    return value_source.get<CTInteger64>();
-    break;
-  case libcamera::ControlTypeFloat:
-    return value_source.get<CTFloat>();
-    break;
-  case libcamera::ControlTypeString:
-    return value_source.get<CTString>();
-    break;
-  case libcamera::ControlTypeRectangle:
-    return value_source.get<CTRectangle>();
-    break;
-  case libcamera::ControlTypeSize:
-    return value_source.get<CTSize>();
-    break;
+  if (value_source.isArray()) {
+    switch (value_source.type()) {
+    case libcamera::ControlTypeNone:
+      return {};
+    case libcamera::ControlTypeBool:
+      return value_source.get<libcamera::Span<const CTBool>>();
+    case libcamera::ControlTypeByte:
+      return value_source.get<libcamera::Span<const CTByte>>();
+    case libcamera::ControlTypeInteger32:
+      return value_source.get<libcamera::Span<const CTInteger32>>();
+    case libcamera::ControlTypeInteger64:
+      return value_source.get<libcamera::Span<const CTInteger64>>();
+    case libcamera::ControlTypeFloat:
+      return value_source.get<libcamera::Span<const CTFloat>>();
+    case libcamera::ControlTypeString:
+      return value_source.get<libcamera::Span<const CTString>>();
+    case libcamera::ControlTypeRectangle:
+      return value_source.get<libcamera::Span<const CTRectangle>>();
+    case libcamera::ControlTypeSize:
+      return value_source.get<libcamera::Span<const CTSize>>();
+    }
+  }
+  else {
+    switch (value_source.type()) {
+    case libcamera::ControlTypeNone:
+      return {};
+    case libcamera::ControlTypeBool:
+      return value_source.get<CTBool>();
+    case libcamera::ControlTypeByte:
+      return value_source.get<CTByte>();
+    case libcamera::ControlTypeInteger32:
+      return value_source.get<CTInteger32>();
+    case libcamera::ControlTypeInteger64:
+      return value_source.get<CTInteger64>();
+    case libcamera::ControlTypeFloat:
+      return value_source.get<CTFloat>();
+    case libcamera::ControlTypeString:
+      return value_source.get<CTString>();
+    case libcamera::ControlTypeRectangle:
+      return value_source.get<CTRectangle>();
+    case libcamera::ControlTypeSize:
+      return value_source.get<CTSize>();
+    }
   }
   return {};
 }
