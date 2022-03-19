@@ -74,50 +74,79 @@ typedef ControlTypeMap<libcamera::ControlTypeString>::type CTString;
 typedef ControlTypeMap<libcamera::ControlTypeRectangle>::type CTRectangle;
 typedef ControlTypeMap<libcamera::ControlTypeSize>::type CTSize;
 
-std::any convert_type(const libcamera::ControlValue &value_source)
+typedef std::vector<std::any> vec_any;
+
+vec_any convert_type(const libcamera::ControlValue &value_source)
 {
   if (value_source.isArray()) {
+    // array
     switch (value_source.type()) {
     case libcamera::ControlTypeNone:
       return {};
     case libcamera::ControlTypeBool:
-      return value_source.get<libcamera::Span<const CTBool>>();
+    {
+      const auto v = value_source.get<libcamera::Span<const CTBool>>();
+      return {v.begin(), v.end()};
+    }
+      //      return value_source.get<libcamera::Span<const CTBool>>();
     case libcamera::ControlTypeByte:
-      return value_source.get<libcamera::Span<const CTByte>>();
+    {
+      const auto v = value_source.get<libcamera::Span<const CTByte>>();
+      return {v.begin(), v.end()};
+    }
     case libcamera::ControlTypeInteger32:
-      return value_source.get<libcamera::Span<const CTInteger32>>();
+    {
+      const auto v = value_source.get<libcamera::Span<const CTInteger32>>();
+      return {v.begin(), v.end()};
+    }
     case libcamera::ControlTypeInteger64:
-      return value_source.get<libcamera::Span<const CTInteger64>>();
+    {
+      const auto v = value_source.get<libcamera::Span<const CTInteger64>>();
+      return {v.begin(), v.end()};
+    }
     case libcamera::ControlTypeFloat:
-      return value_source.get<libcamera::Span<const CTFloat>>();
+    {
+      const auto v = value_source.get<libcamera::Span<const CTFloat>>();
+      return {v.begin(), v.end()};
+    }
     case libcamera::ControlTypeString:
-      return value_source.get<libcamera::Span<const CTString>>();
+    {
+      const auto v = value_source.get<libcamera::Span<const CTString>>();
+      return {v.begin(), v.end()};
+    }
     case libcamera::ControlTypeRectangle:
-      return value_source.get<libcamera::Span<const CTRectangle>>();
+    {
+      const auto v = value_source.get<libcamera::Span<const CTRectangle>>();
+      return {v.begin(), v.end()};
+    }
     case libcamera::ControlTypeSize:
-      return value_source.get<libcamera::Span<const CTSize>>();
+    {
+      const auto v = value_source.get<libcamera::Span<const CTSize>>();
+      return {v.begin(), v.end()};
+    }
     }
   }
   else {
+    // scalar
     switch (value_source.type()) {
     case libcamera::ControlTypeNone:
       return {};
     case libcamera::ControlTypeBool:
-      return value_source.get<CTBool>();
+      return {value_source.get<CTBool>()};
     case libcamera::ControlTypeByte:
-      return value_source.get<CTByte>();
+      return {value_source.get<CTByte>()};
     case libcamera::ControlTypeInteger32:
-      return value_source.get<CTInteger32>();
+      return {value_source.get<CTInteger32>()};
     case libcamera::ControlTypeInteger64:
-      return value_source.get<CTInteger64>();
+      return {value_source.get<CTInteger64>()};
     case libcamera::ControlTypeFloat:
-      return value_source.get<CTFloat>();
+      return {value_source.get<CTFloat>()};
     case libcamera::ControlTypeString:
-      return value_source.get<CTString>();
+      return {value_source.get<CTString>()};
     case libcamera::ControlTypeRectangle:
-      return value_source.get<CTRectangle>();
+      return {value_source.get<CTRectangle>()};
     case libcamera::ControlTypeSize:
-      return value_source.get<CTSize>();
+      return {value_source.get<CTSize>()};
     }
   }
   return {};
@@ -218,10 +247,10 @@ T convert_any(const std::any &value)
 }
 
 template<typename T>
-std::any cast_type(const std::any &value)
+T cast_type(const std::any &value)
 {
-  if (typeid(T) == value.type())
-    return value;
+  //  if (typeid(T) == value.type())
+  //    return value;
 
   if (value.type() == typeid(CTNone))
     return {};
@@ -244,5 +273,5 @@ std::any cast_type(const std::any &value)
   else
     return {};
 
-  return value;
+  //  return value;
 }
