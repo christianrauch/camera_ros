@@ -85,23 +85,11 @@ const std::unordered_map<uint32_t, std::string> map_format_compressed = {
 };
 
 template<typename T>
-T clamp_scalar(const T &value, const T &min, const T &max)
-{
-  return std::min<T>(std::max<T>(min, value), max);
-}
-
-//template<typename T>
-//T clamp_any(const std::any &value, const std::any &min, const std::any &max)
-//{
-//  return std::min<T>(std::max<T>(min, value), max);
-//}
-
-template<typename T>
 rclcpp::ParameterValue clamp(const vec_any &value, const vec_any &min, const vec_any &max)
 {
   std::vector<T> pv(value.size());
   for (size_t i = 0; i < value.size(); i++) {
-    pv[i] = clamp_scalar(cast_type<T>(value[i]), cast_type<T>(min[i]), cast_type<T>(max[i]));
+    pv[i] = std::clamp(cast_type<T>(value[i]), cast_type<T>(min[i]), cast_type<T>(max[i]));
   }
   //  return rclcpp::ParameterValue(std::min<T>(
   //    std::max<T>(std::any_cast<T>(cast_type<T>(min)), std::any_cast<T>(cast_type<T>(value))),
