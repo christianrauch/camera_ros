@@ -103,6 +103,58 @@ rclcpp::ParameterValue clamp(const vec_any &value, const vec_any &min, const vec
     return rclcpp::ParameterValue(pv[0]);
 }
 
+template<typename T>
+T clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
+        const libcamera::ControlValue &max)
+{
+  return std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
+}
+
+
+template<>
+libcamera::Rectangle clamp<libcamera::Rectangle>(const libcamera::ControlValue &value,
+                                                 const libcamera::ControlValue &min,
+                                                 const libcamera::ControlValue &max)
+{
+  const libcamera::Rectangle &rv = value.get<libcamera::Rectangle>();
+  const libcamera::Rectangle &rmin = min.get<libcamera::Rectangle>();
+  const libcamera::Rectangle &rmax = max.get<libcamera::Rectangle>();
+
+  const int x = std::clamp(rv.x, rmin.x, rmax.x);
+  const int y = std::clamp(rv.y, rmin.y, rmax.y);
+  unsigned int width = std::clamp(x + rv.width, rmin.x + rmin.width, rmax.x + rmax.width) - x;
+  unsigned int height = std::clamp(y + rv.height, rmin.y + rmin.height, rmax.y + rmax.height) - y;
+
+  return {x, y, width, height};
+}
+
+libcamera::ControlValue clamp(const libcamera::ControlValue &value,
+                              const libcamera::ControlValue &min,
+                              const libcamera::ControlValue &max)
+{
+  assert(min.type() == max.type());
+  switch (value.type()) {
+  case libcamera::ControlTypeNone:
+    return {};
+  case libcamera::ControlTypeBool:
+    return clamp<ControlTypeMap<libcamera::ControlTypeBool>::type>(value, min, max);
+  case libcamera::ControlTypeByte:
+    return clamp<ControlTypeMap<libcamera::ControlTypeByte>::type>(value, min, max);
+  case libcamera::ControlTypeInteger32:
+    return clamp<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(value, min, max);
+  case libcamera::ControlTypeInteger64:
+    return clamp<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(value, min, max);
+  case libcamera::ControlTypeFloat:
+    return clamp<ControlTypeMap<libcamera::ControlTypeFloat>::type>(value, min, max);
+  case libcamera::ControlTypeString:
+    return clamp<ControlTypeMap<libcamera::ControlTypeString>::type>(value, min, max);
+  case libcamera::ControlTypeRectangle:
+    return clamp<ControlTypeMap<libcamera::ControlTypeRectangle>::type>(value, min, max);
+  case libcamera::ControlTypeSize:
+    return clamp<ControlTypeMap<libcamera::ControlTypeSize>::type>(value, min, max);
+  }
+}
+
 CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options), cim(this)
 {
   // pixel format
