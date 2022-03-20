@@ -609,13 +609,16 @@ CameraNode::requestComplete(libcamera::Request *request)
 rcl_interfaces::msg::SetParametersResult
 CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
 {
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+
   for (const rclcpp::Parameter &parameter : parameters) {
     std::cout << "set " << parameter.get_name() << ": " << parameter.value_to_string() << " ("
               << parameter.get_type_name() << ")" << std::endl;
 
     if (parameter_ids.count(parameter.get_name())) {
       libcamera::ControlValue value;
-      const libcamera::ControlType &type = parameter_ids.at(parameter.get_name())->type();
+      const libcamera::ControlId *id = parameter_ids.at(parameter.get_name());
       switch (parameter.get_type()) {
       case rclcpp::ParameterType::PARAMETER_NOT_SET:
         break;
@@ -623,12 +626,16 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
         value.set(parameter.as_bool());
         break;
       case rclcpp::ParameterType::PARAMETER_INTEGER:
-        if (type == libcamera::ControlTypeInteger32)
+        if (id->type() == libcamera::ControlTypeInteger32)
           value.set(CTInteger32(parameter.as_int()));
-        else if (type == libcamera::ControlTypeInteger64)
+        else if (id->type() == libcamera::ControlTypeInteger64)
           value.set(CTInteger64(parameter.as_int()));
-        else
-          throw std::runtime_error("invalid integer type: " + std::to_string(type));
+        else {
+          result.successful = false;
+          result.reason =
+            parameter.get_name() + ": invalid integer type: " + std::to_string(id->type());
+          return result;
+        }
         break;
       case rclcpp::ParameterType::PARAMETER_DOUBLE:
         value.set(CTFloat(parameter.as_double()));
@@ -637,11 +644,44 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
         value.set(parameter.as_string());
         break;
       case rclcpp::ParameterType::PARAMETER_BYTE_ARRAY:
-      case rclcpp::ParameterType::PARAMETER_BOOL_ARRAY:
-      case rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY:
-      case rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY:
-      case rclcpp::ParameterType::PARAMETER_STRING_ARRAY:
+        value.set(libcamera::Span<const CTByte>(parameter.as_byte_array()));
         break;
+      case rclcpp::ParameterType::PARAMETER_BOOL_ARRAY:
+        result.successful = false;
+        result.reason = parameter.get_name() + ": unsupported type: " + parameter.get_type_name();
+        return result;
+      case rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY:
+        value.set(libcamera::Span<const CTInteger64>(parameter.as_integer_array()));
+        break;
+      case rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY:
+      {
+        // convert to float vector
+        const std::vector<double> &vd = parameter.as_double_array();
+        const std::vector<CTFloat> vf(vd.begin(), vd.end());
+        value.set(libcamera::Span<const CTFloat>(vf));
+        break;
+      }
+      case rclcpp::ParameterType::PARAMETER_STRING_ARRAY:
+        value.set(libcamera::Span<const CTString>(parameter.as_string_array()));
+        break;
+      }
+
+      // verify parameter type and dimension against default
+      const libcamera::ControlValue &ci = camera->controls().at(id).def();
+
+      if (value.type() != id->type()) {
+        result.successful = false;
+        result.reason = parameter.get_name() + ": parameter types mismatch, expected " +
+                        std::to_string(id->type()) + ", got " + std::to_string(value.type());
+        return result;
+      }
+
+      if (value.isArray() != ci.isArray() || value.numElements() != ci.numElements()) {
+        result.successful = false;
+        result.reason = parameter.get_name() + ": parameter dimensions mismatch, expected " +
+                        std::to_string(ci.numElements()) + ", got " +
+                        std::to_string(value.numElements());
+        return result;
       }
 
       if (!value.isNone()) {
@@ -675,8 +715,6 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
     }
   }
 
-  rcl_interfaces::msg::SetParametersResult result;
-  result.successful = true;
   return result;
 }
 
