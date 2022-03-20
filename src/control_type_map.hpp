@@ -86,43 +86,43 @@ vec_any convert_type(const libcamera::ControlValue &value_source)
     case libcamera::ControlTypeBool:
     {
       const auto v = value_source.get<libcamera::Span<const CTBool>>();
-      return {v.begin(), v.end()};
+      return vec_any(v.begin(), v.end());
     }
       //      return value_source.get<libcamera::Span<const CTBool>>();
     case libcamera::ControlTypeByte:
     {
       const auto v = value_source.get<libcamera::Span<const CTByte>>();
-      return {v.begin(), v.end()};
+      return vec_any(v.begin(), v.end());
     }
     case libcamera::ControlTypeInteger32:
     {
       const auto v = value_source.get<libcamera::Span<const CTInteger32>>();
-      return {v.begin(), v.end()};
+      return vec_any(v.begin(), v.end());
     }
     case libcamera::ControlTypeInteger64:
     {
       const auto v = value_source.get<libcamera::Span<const CTInteger64>>();
-      return {v.begin(), v.end()};
+      return vec_any(v.begin(), v.end());
     }
     case libcamera::ControlTypeFloat:
     {
       const auto v = value_source.get<libcamera::Span<const CTFloat>>();
-      return {v.begin(), v.end()};
+      return vec_any(v.begin(), v.end());
     }
     case libcamera::ControlTypeString:
     {
       const auto v = value_source.get<libcamera::Span<const CTString>>();
-      return {v.begin(), v.end()};
+      return vec_any(v.begin(), v.end());
     }
     case libcamera::ControlTypeRectangle:
     {
       const auto v = value_source.get<libcamera::Span<const CTRectangle>>();
-      return {v.begin(), v.end()};
+      return vec_any(v.begin(), v.end());
     }
     case libcamera::ControlTypeSize:
     {
       const auto v = value_source.get<libcamera::Span<const CTSize>>();
-      return {v.begin(), v.end()};
+      return vec_any(v.begin(), v.end());
     }
     }
   }
