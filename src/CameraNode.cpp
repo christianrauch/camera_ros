@@ -640,6 +640,7 @@ CameraNode::requestComplete(libcamera::Request *request)
 
   // update parameters
   parameters_lock.lock();
+  // TODO: only update parameters that changed
   request->controls() = parameters;
   parameters_lock.unlock();
 
@@ -725,6 +726,9 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
       }
 
       if (!value.isNone()) {
+        // clamp values
+        value = clamp(value, camera->controls().at(id).min(), camera->controls().at(id).max());
+
         parameters_lock.lock();
         this->parameters.set(parameter_ids.at(parameter.get_name())->id(), value);
         //        libcamera::ControlValidator val;
