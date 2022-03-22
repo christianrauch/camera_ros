@@ -337,7 +337,11 @@ libcamera::ControlValue cast_cv(const libcamera::ControlValue & /*value*/)
   throw std::runtime_error("unsupported cast");
 }
 
-#define CASE_CAST(F)                                                                               \
+#define CASE_CAST_CONV1(F)                                                                         \
+  case libcamera::ControlType##F:                                                                  \
+    return cast_cv<ControlTypeMap<libcamera::ControlType##F>::type>(value);
+
+#define CASE_CAST_CONV2(F)                                                                         \
   case libcamera::ControlType##F:                                                                  \
     return cast_cv<ControlTypeMap<libcamera::ControlType##F>::type, T>(value);
 
@@ -350,36 +354,32 @@ libcamera::ControlValue cast_cv(const libcamera::ControlValue &value)
 {
   switch (value.type()) {
     CASE_NONE(None)
-    CASE_CAST(Bool)
-    CASE_CAST(Byte)
-    CASE_CAST(Integer32)
-    CASE_CAST(Integer64)
-    CASE_CAST(Float)
-    CASE_CAST(String)
-    CASE_CAST(Rectangle)
-    CASE_CAST(Size)
+    CASE_CAST_CONV2(Bool)
+    CASE_CAST_CONV2(Byte)
+    CASE_CAST_CONV2(Integer32)
+    CASE_CAST_CONV2(Integer64)
+    CASE_CAST_CONV2(Float)
+    CASE_CAST_CONV2(String)
+    CASE_CAST_CONV2(Rectangle)
+    CASE_CAST_CONV2(Size)
   }
 
   return {};
 }
-
-#define CASE_CAST2(F)                                                                              \
-  case libcamera::ControlType##F:                                                                  \
-    return cast_cv<ControlTypeMap<libcamera::ControlType##F>::type>(value);
 
 libcamera::ControlValue cast_cv(const libcamera::ControlValue &value,
                                 const libcamera::ControlType target_type)
 {
   switch (target_type) {
     CASE_NONE(None)
-    CASE_CAST2(Bool)
-    CASE_CAST2(Byte)
-    CASE_CAST2(Integer32)
-    CASE_CAST2(Integer64)
-    CASE_CAST2(Float)
-    CASE_CAST2(String)
-    CASE_CAST2(Rectangle)
-    CASE_CAST2(Size)
+    CASE_CAST_CONV1(Bool)
+    CASE_CAST_CONV1(Byte)
+    CASE_CAST_CONV1(Integer32)
+    CASE_CAST_CONV1(Integer64)
+    CASE_CAST_CONV1(Float)
+    CASE_CAST_CONV1(String)
+    CASE_CAST_CONV1(Rectangle)
+    CASE_CAST_CONV1(Size)
   }
 
   return {};
