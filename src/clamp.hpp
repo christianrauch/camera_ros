@@ -155,3 +155,27 @@ rclcpp::ParameterValue control_to_pv(const libcamera::ControlValue &value)
 
   return {};
 }
+
+template<typename T, std::enable_if_t<std::is_arithmetic<T>::value, bool> = true>
+T min(const libcamera::ControlValue &value)
+{
+  if (value.isArray()) {
+    const libcamera::Span<const T> v = value.get<libcamera::Span<const T>>();
+    return *std::min_element(v.begin(), v.end());
+  }
+  else {
+    return value.get<T>();
+  }
+}
+
+template<typename T, std::enable_if_t<std::is_arithmetic<T>::value, bool> = true>
+T max(const libcamera::ControlValue &value)
+{
+  if (value.isArray()) {
+    const libcamera::Span<const T> v = value.get<libcamera::Span<const T>>();
+    return *std::max_element(v.begin(), v.end());
+  }
+  else {
+    return value.get<T>();
+  }
+}

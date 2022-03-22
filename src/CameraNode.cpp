@@ -354,6 +354,23 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     //      break;
     //    }
 
+    switch (id->type()) {
+    case libcamera::ControlTypeInteger32:
+      range_int.from_value = max<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(val_min);
+      range_int.to_value = min<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(val_max);
+      break;
+    case libcamera::ControlTypeInteger64:
+      range_int.from_value = max<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(val_min);
+      range_int.to_value = min<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(val_max);
+      break;
+    case libcamera::ControlTypeFloat:
+      range_float.from_value = max<ControlTypeMap<libcamera::ControlTypeFloat>::type>(val_min);
+      range_float.to_value = min<ControlTypeMap<libcamera::ControlTypeFloat>::type>(val_max);
+      break;
+    default:
+      break;
+    }
+
     //    for (size_t i = 0; i < val_min.size(); i++) {
     //      rcl_interfaces::msg::IntegerRange range_int;
     //      rcl_interfaces::msg::FloatingPointRange range_float;
