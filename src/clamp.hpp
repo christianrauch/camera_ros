@@ -87,11 +87,23 @@ std::vector<T> extract_value(const libcamera::ControlValue &value)
   }
 }
 
+template<typename T, std::enable_if_t<std::is_integral<T>::value, bool> = true>
+rclcpp::ParameterValue control_array_to_pv(const std::vector<T> &values)
+{
+  return rclcpp::ParameterValue(values);
+}
+
+template<typename T, std::enable_if_t<!std::is_integral<T>::value, bool> = true>
+rclcpp::ParameterValue control_array_to_pv(const std::vector<T> & /*values*/)
+{
+  throw std::runtime_error("ParameterValue only supported for integral types");
+}
+
 template<typename T>
 rclcpp::ParameterValue control_to_pv(const std::vector<T> &values)
 {
   if (values.size() > 1)
-    return rclcpp::ParameterValue(values);
+    return control_array_to_pv(values);
   else if (values.size() == 1)
     return rclcpp::ParameterValue(values[0]);
   else
@@ -106,7 +118,6 @@ rclcpp::ParameterValue control_to_pv(const std::vector<T> &values)
   case libcamera::ControlType##T:                                                                  \
     return {};
 
-//template<typename T>
 rclcpp::ParameterValue control_to_pv(const libcamera::ControlValue &value)
 {
   switch (value.type()) {
@@ -117,7 +128,7 @@ rclcpp::ParameterValue control_to_pv(const libcamera::ControlValue &value)
     CASE_CONVERT(Integer64)
     CASE_CONVERT(Float)
     CASE_CONVERT(String)
-    //    CASE_CONVERT(Rectangle) // TODO
-    //    CASE_CONVERT(Size) // TODO
+    CASE_CONVERT(Rectangle)
+    CASE_CONVERT(Size)
   }
 }
