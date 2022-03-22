@@ -131,4 +131,6 @@ rclcpp::ParameterValue control_to_pv(const libcamera::ControlValue &value)
     CASE_CONVERT(Rectangle)
     CASE_CONVERT(Size)
   }
+
+  return {};
 }

@@ -359,6 +359,8 @@ libcamera::ControlValue cast_cv(const libcamera::ControlValue &value)
     CASE_CAST(Rectangle)
     CASE_CAST(Size)
   }
+
+  return {};
 }
 
 #define CASE_CAST2(F)                                                                              \
@@ -379,6 +381,8 @@ libcamera::ControlValue cast_cv(const libcamera::ControlValue &value,
     CASE_CAST2(Rectangle)
     CASE_CAST2(Size)
   }
+
+  return {};
 }
 
 template<typename T, typename F>
