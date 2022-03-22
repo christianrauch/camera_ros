@@ -76,7 +76,7 @@ typedef ControlTypeMap<libcamera::ControlTypeSize>::type CTSize;
 
 typedef std::vector<std::any> vec_any;
 
-vec_any convert_type(const libcamera::ControlValue &value_source)
+vec_any cast_type(const libcamera::ControlValue &value_source)
 {
   if (value_source.isArray()) {
     // array
@@ -152,8 +152,15 @@ vec_any convert_type(const libcamera::ControlValue &value_source)
   return {};
 }
 
-template<typename T, typename F>
-T convert(const F &value)
+
+template<typename T, typename F, std::enable_if_t<std::is_same<T, F>::value, bool> = true>
+const T &cast(const F &value)
+{
+  return value;
+}
+
+template<typename T, typename F, std::enable_if_t<!std::is_same<T, F>::value, bool> = true>
+T cast(const F &value)
 {
   return T(value);
 }
@@ -161,7 +168,7 @@ T convert(const F &value)
 // from ControlTypeBool
 
 template<>
-CTString convert(const CTBool &value)
+CTString cast(const CTBool &value)
 {
   return std::to_string(value);
 }
@@ -169,7 +176,7 @@ CTString convert(const CTBool &value)
 // from ControlTypeByte
 
 template<>
-CTString convert(const CTByte &value)
+CTString cast(const CTByte &value)
 {
   return std::to_string(value);
 }
@@ -177,7 +184,7 @@ CTString convert(const CTByte &value)
 // from ControlTypeInteger32
 
 template<>
-CTString convert(const CTInteger32 &value)
+CTString cast(const CTInteger32 &value)
 {
   return std::to_string(value);
 }
@@ -185,7 +192,7 @@ CTString convert(const CTInteger32 &value)
 // from ControlTypeInteger64
 
 template<>
-CTString convert(const CTInteger64 &value)
+CTString cast(const CTInteger64 &value)
 {
   return std::to_string(value);
 }
@@ -193,7 +200,7 @@ CTString convert(const CTInteger64 &value)
 // from ControlTypeFloat
 
 template<>
-CTString convert(const CTFloat &value)
+CTString cast(const CTFloat &value)
 {
   return std::to_string(value);
 }
@@ -201,7 +208,7 @@ CTString convert(const CTFloat &value)
 // from ControlTypeString
 
 template<>
-CTBool convert(const CTString &value)
+CTBool cast(const CTString &value)
 {
   bool v;
   std::istringstream vss(value);
@@ -215,35 +222,169 @@ CTBool convert(const CTString &value)
 }
 
 template<>
-CTByte convert(const CTString &value)
+CTByte cast(const CTString &value)
 {
   return std::stoi(value);
 }
 
 template<>
-CTInteger32 convert(const CTString &value)
+CTInteger32 cast(const CTString &value)
 {
   // long int
   return std::stol(value);
 }
 
 template<>
-CTInteger64 convert(const CTString &value)
+CTInteger64 cast(const CTString &value)
 {
   // long long int
   return std::stoll(value);
 }
 
 template<>
-CTFloat convert(const CTString &value)
+CTFloat cast(const CTString &value)
 {
   return std::stof(value);
 }
 
-template<typename T, typename F>
-T convert_any(const std::any &value)
+//// from ControlTypeRectangle
+
+//template<typename T, typename F,
+//         std::enable_if_t<!std::is_same<T, CTRectangle>::value, bool> = true>
+//T cast(const CTRectangle & /*value*/)
+//{
+//  throw std::runtime_error("unsupported cast from ControlTypeRectangle");
+//}
+
+//template<
+//  typename T, typename F,
+//  std::enable_if_t<std::is_same<T, CTRectangle>::value && !std::is_same<F, CTRectangle>::value,
+//                   bool> = true>
+//CTRectangle cast(const F & /*value*/)
+//{
+//  throw std::runtime_error("unsupported cast to ControlTypeRectangle");
+//}
+
+//// from ControlTypeSize
+
+//template<typename T, typename F, std::enable_if_t<!std::is_same<T, CTSize>::value, bool> = true>
+//T cast(const CTSize & /*value*/)
+//{
+//  throw std::runtime_error("unsupported cast from ControlTypeSize");
+//}
+
+//template<
+//  typename T, typename F,
+//  std::enable_if_t<std::is_same<T, CTSize>::value && !std::is_same<F, CTSize>::value, bool> = true>
+//CTSize cast(const F & /*value*/)
+//{
+//  throw std::runtime_error("unsupported cast to ControlTypeSize");
+//}
+
+
+template<typename F, typename T,
+         std::enable_if_t<!std::is_same<std::remove_cv_t<F>, std::remove_cv_t<T>>::value &&
+                            !std::is_same<std::remove_cv_t<T>, CTBool>::value &&
+                            !(std::is_same<std::remove_cv_t<F>, CTRectangle>::value ||
+                              std::is_same<std::remove_cv_t<T>, CTRectangle>::value ||
+                              std::is_same<std::remove_cv_t<F>, CTSize>::value ||
+                              std::is_same<std::remove_cv_t<T>, CTSize>::value),
+                          bool> = true>
+libcamera::ControlValue cast_cv(const libcamera::ControlValue &value)
 {
-  return convert<T, F>(std::any_cast<F>(value));
+  if (value.isArray()) {
+    std::vector<T> a;
+    for (const F &v : value.get<libcamera::Span<const F>>())
+      a.push_back(cast<T, F>(v));
+    return libcamera::ControlValue(libcamera::Span<const T>(a));
+  }
+  else {
+    return libcamera::ControlValue(cast<T, F>(value.get<F>()));
+  }
+}
+
+template<typename F, typename T,
+         std::enable_if_t<!std::is_same<std::remove_cv_t<F>, std::remove_cv_t<T>>::value &&
+                            std::is_same<std::remove_cv_t<T>, CTBool>::value &&
+                            !(std::is_same<std::remove_cv_t<F>, CTRectangle>::value ||
+                              std::is_same<std::remove_cv_t<F>, CTSize>::value),
+                          bool> = true>
+libcamera::ControlValue cast_cv(const libcamera::ControlValue &value)
+{
+  if (value.isArray())
+    throw std::runtime_error("unsupported array conversion for CTBool");
+  else
+    return libcamera::ControlValue(cast<T, F>(value.get<F>()));
+}
+
+template<
+  typename F, typename T,
+  std::enable_if_t<std::is_same<std::remove_cv_t<F>, std::remove_cv_t<T>>::value, bool> = true>
+const libcamera::ControlValue &cast_cv(const libcamera::ControlValue &value)
+{
+  return value;
+}
+
+template<typename F, typename T,
+         std::enable_if_t<!std::is_same<std::remove_cv_t<F>, std::remove_cv_t<T>>::value &&
+                            (std::is_same<std::remove_cv_t<F>, CTRectangle>::value ||
+                             std::is_same<std::remove_cv_t<T>, CTRectangle>::value ||
+                             std::is_same<std::remove_cv_t<F>, CTSize>::value ||
+                             std::is_same<std::remove_cv_t<T>, CTSize>::value),
+                          bool> = true>
+libcamera::ControlValue cast_cv(const libcamera::ControlValue & /*value*/)
+{
+  throw std::runtime_error("unsupported cast");
+}
+
+#define CASE_CAST(F)                                                                               \
+  case libcamera::ControlType##F:                                                                  \
+    return cast_cv<ControlTypeMap<libcamera::ControlType##F>::type, T>(value);
+
+#define CASE_NONE(T)                                                                               \
+  case libcamera::ControlType##T:                                                                  \
+    return {};
+
+template<typename T>
+libcamera::ControlValue cast_cv(const libcamera::ControlValue &value)
+{
+  switch (value.type()) {
+    CASE_NONE(None)
+    CASE_CAST(Bool)
+    CASE_CAST(Byte)
+    CASE_CAST(Integer32)
+    CASE_CAST(Integer64)
+    CASE_CAST(Float)
+    CASE_CAST(String)
+    CASE_CAST(Rectangle)
+    CASE_CAST(Size)
+  }
+}
+
+#define CASE_CAST2(F)                                                                              \
+  case libcamera::ControlType##F:                                                                  \
+    return cast_cv<ControlTypeMap<libcamera::ControlType##F>::type>(value);
+
+libcamera::ControlValue cast_cv(const libcamera::ControlValue &value,
+                                const libcamera::ControlType target_type)
+{
+  switch (target_type) {
+    CASE_NONE(None)
+    CASE_CAST2(Bool)
+    CASE_CAST2(Byte)
+    CASE_CAST2(Integer32)
+    CASE_CAST2(Integer64)
+    CASE_CAST2(Float)
+    CASE_CAST2(String)
+    CASE_CAST2(Rectangle)
+    CASE_CAST2(Size)
+  }
+}
+
+template<typename T, typename F>
+T cast_any(const std::any &value)
+{
+  return cast<T, F>(std::any_cast<F>(value));
 }
 
 template<typename T>
@@ -255,17 +396,17 @@ T cast_type(const std::any &value)
   if (value.type() == typeid(CTNone))
     return {};
   else if (value.type() == typeid(CTBool))
-    return convert_any<T, CTBool>(value);
+    return cast_any<T, CTBool>(value);
   else if (value.type() == typeid(CTByte))
-    return convert_any<T, CTByte>(value);
+    return cast_any<T, CTByte>(value);
   else if (value.type() == typeid(CTInteger32))
-    return convert_any<T, CTInteger32>(value);
+    return cast_any<T, CTInteger32>(value);
   else if (value.type() == typeid(CTInteger64))
-    return convert_any<T, CTInteger64>(value);
+    return cast_any<T, CTInteger64>(value);
   else if (value.type() == typeid(CTFloat))
-    return convert_any<T, CTFloat>(value);
+    return cast_any<T, CTFloat>(value);
   else if (value.type() == typeid(CTString))
-    return convert_any<T, CTString>(value);
+    return cast_any<T, CTString>(value);
   else if (value.type() == typeid(CTRectangle))
     return {};
   else if (value.type() == typeid(CTSize))
