@@ -4,45 +4,66 @@
 #include <rclcpp/parameter_value.hpp>
 
 
-template<typename T>
-libcamera::ControlValue clamp_scalar(const libcamera::ControlValue &value,
-                                     const libcamera::ControlValue &min,
-                                     const libcamera::ControlValue &max)
+namespace std
 {
-  //  std::cout << value.isArray() << " / scalar" << std::endl;
-  return std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
+
+CTRectangle clamp(const CTRectangle &val, const CTRectangle &lo, const CTRectangle &hi)
+{
+  const int x = std::clamp(val.x, lo.x, hi.x);
+  const int y = std::clamp(val.y, lo.y, hi.y);
+  unsigned int width = std::clamp(x + val.width, lo.x + lo.width, hi.x + hi.width) - x;
+  unsigned int height = std::clamp(y + val.height, lo.y + lo.height, hi.y + hi.height) - y;
+
+  return CTRectangle {x, y, width, height};
 }
 
-template<>
-libcamera::ControlValue clamp_scalar<libcamera::Rectangle>(const libcamera::ControlValue &value,
-                                                           const libcamera::ControlValue &min,
-                                                           const libcamera::ControlValue &max)
-{
-  const libcamera::Rectangle &rv = value.get<libcamera::Rectangle>();
-  const libcamera::Rectangle &rmin = min.get<libcamera::Rectangle>();
-  const libcamera::Rectangle &rmax = max.get<libcamera::Rectangle>();
+} // namespace std
 
-  const int x = std::clamp(rv.x, rmin.x, rmax.x);
-  const int y = std::clamp(rv.y, rmin.y, rmax.y);
-  unsigned int width = std::clamp(x + rv.width, rmin.x + rmin.width, rmax.x + rmax.width) - x;
-  unsigned int height = std::clamp(y + rv.height, rmin.y + rmin.height, rmax.y + rmax.height) - y;
-
-  return libcamera::Rectangle {x, y, width, height};
-}
 
 template<typename T>
+libcamera::ControlValue clamp_array(const libcamera::ControlValue &value,
+                                    const libcamera::ControlValue &min,
+                                    const libcamera::ControlValue &max)
+{
+  const libcamera::Span<const T> v = value.get<libcamera::Span<const T>>();
+  const libcamera::Span<const T> a = min.get<libcamera::Span<const T>>();
+  const libcamera::Span<const T> b = max.get<libcamera::Span<const T>>();
+
+  std::vector<T> vclamp(v.size());
+
+  for (size_t i = 0; i < v.size(); i++)
+    vclamp[i] = std::clamp(v[i], a[i], b[i]);
+
+  return libcamera::ControlValue(libcamera::Span<const T>(vclamp));
+}
+
+template<typename T,
+         std::enable_if_t<!std::is_same<std::remove_cv_t<T>, CTBool>::value, bool> = true>
 libcamera::ControlValue clamp(const libcamera::ControlValue &value,
                               const libcamera::ControlValue &min,
                               const libcamera::ControlValue &max)
 {
   if (value.isArray()) {
-    //    return clamp_scalar<T>(value, min, max);
-    return {};
+    return clamp_array<T>(value, min, max);
   }
   else {
-    return clamp_scalar<T>(value, min, max);
+    return std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
+    //    return clamp_scalar<T>(value, min, max);
   }
 }
+
+template<typename T,
+         std::enable_if_t<std::is_same<std::remove_cv_t<T>, CTBool>::value, bool> = true>
+libcamera::ControlValue clamp(const libcamera::ControlValue &value,
+                              const libcamera::ControlValue & /*min*/,
+                              const libcamera::ControlValue & /*max*/)
+{
+  return value;
+}
+
+//#define CASE_CLAMP(T)                                                                              \
+//  case libcamera::ControlType##T:                                                                  \
+//    return clamp<ControlTypeMap<libcamera::ControlType##T>::type>(value, min, max);
 
 libcamera::ControlValue clamp(const libcamera::ControlValue &value,
                               const libcamera::ControlValue &min,

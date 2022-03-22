@@ -84,19 +84,19 @@ const std::unordered_map<uint32_t, std::string> map_format_compressed = {
   {libcamera::formats::MJPEG.fourcc(), "jpeg"},
 };
 
-template<typename T>
-rclcpp::ParameterValue clamp(const vec_any &value, const vec_any &min, const vec_any &max)
-{
-  std::vector<T> pv(value.size());
-  for (size_t i = 0; i < value.size(); i++) {
-    pv[i] = std::clamp(cast_type<T>(value[i]), cast_type<T>(min[i]), cast_type<T>(max[i]));
-  }
+//template<typename T>
+//rclcpp::ParameterValue clamp(const vec_any &value, const vec_any &min, const vec_any &max)
+//{
+//  std::vector<T> pv(value.size());
+//  for (size_t i = 0; i < value.size(); i++) {
+//    pv[i] = std::clamp(cast_type<T>(value[i]), cast_type<T>(min[i]), cast_type<T>(max[i]));
+//  }
 
-  if (pv.size() > 1)
-    return rclcpp::ParameterValue(pv);
-  else
-    return rclcpp::ParameterValue(pv[0]);
-}
+//  if (pv.size() > 1)
+//    return rclcpp::ParameterValue(pv);
+//  else
+//    return rclcpp::ParameterValue(pv[0]);
+//}
 
 
 CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options), cim(this)
@@ -260,17 +260,16 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     //    std::cout << "param type " << id->name() << ": " << id->type() << " | " << info.def().type()
     //              << ", " << info.min().type() << ", " << info.max().type() << std::endl;
 
-    rclcpp::ParameterValue value;
+    //    rclcpp::ParameterValue value;
 
     //    std::array<vec_any, 2> val_range {convert_type(info.min()),
     //                                                    convert_type(info.max())};
-
-    // TODO: cast def/min/max to same type
 
     //    const vec_any val_def = cast_type(info.def());
     //    const vec_any val_min = cast_type(info.min());
     //    const vec_any val_max = cast_type(info.max());
 
+    // cast all ControlValue to the type provided by the ControlId
     const libcamera::ControlValue val_def = cast_cv(info.def(), id->type());
     const libcamera::ControlValue val_min = cast_cv(info.min(), id->type());
     const libcamera::ControlValue val_max = cast_cv(info.max(), id->type());
@@ -278,53 +277,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     if (val_min.numElements() != val_max.numElements())
       throw std::runtime_error("minimum and maximum parameter array sizes do not match");
 
-    // TODO: clamp default ControlValue
+    // clamp default ControlValue to min/max range
+    const libcamera::ControlValue val = clamp(val_def, val_min, val_max);
 
-    value = control_to_pv(val_def);
-
-    //    switch (id->type()) {
-    //    case libcamera::ControlTypeNone:
-    //      break;
-    //    case libcamera::ControlTypeBool:
-    //      //      value = clamp<CTBool>(val_def, val_min, val_max);
-    //      break;
-    //    case libcamera::ControlTypeByte:
-    //      value = clamp<CTByte>(val_def, val_min, val_max);
-    //      break;
-    //    case libcamera::ControlTypeInteger32:
-    //      //      std::cout << "span? " << libcamera::details::is_span<CTInteger32>::value << std::endl;
-    //      //      range_int.from_value = std::any_cast<CTInteger32>(val_range[0]);
-    //      //      range_int.to_value = std::any_cast<CTInteger32>(val_range[1]);
-    //      value = clamp<CTInteger32>(val_def, val_min, val_max);
-    //      break;
-    //    case libcamera::ControlTypeInteger64:
-    //      //      std::cout << "span? " << libcamera::details::is_span<CTInteger32>::value << std::endl;
-    //      {
-    //        //        rcl_interfaces::msg::IntegerRange range_int;
-    //        //        range_int.from_value = std::any_cast<CTInteger64>(val_min);
-    //        //        range_int.to_value = std::any_cast<CTInteger64>(val_max);
-    //        //        ranges_int.push_back(range_int);
-    //        value = clamp<CTInteger64>(val_def, val_min, val_max);
-    //      }
-    //      break;
-    //    case libcamera::ControlTypeFloat:
-    //      //      std::cout << "span? " << libcamera::details::is_span<CTInteger32>::value << std::endl;
-    //      //      range_float.from_value = std::any_cast<CTFloat>(val_range[0]);
-    //      //      range_float.to_value = std::any_cast<CTFloat>(val_range[1]);
-    //      value = clamp<CTFloat>(val_def, val_min, val_max);
-    //      break;
-    //    case libcamera::ControlTypeString:
-    //      value = clamp<CTString>(val_def, val_min, val_max);
-    //      break;
-    //    case libcamera::ControlTypeRectangle:
-    //      // TODO: 4D array
-    //      //      value = clamp<CTRectangle>(val_def, val_range);
-    //      break;
-    //    case libcamera::ControlTypeSize:
-    //      // TODO: 2D array
-    //      //      value = clamp<CTSize>(val_def, val_range);
-    //      break;
-    //    }
+    // cast ControlValue to ParameterValue
+    const rclcpp::ParameterValue value = control_to_pv(val);
 
     //    std::vector<rcl_interfaces::msg::IntegerRange> ranges_int;
     //    std::vector<rcl_interfaces::msg::FloatingPointRange> ranges_float;
