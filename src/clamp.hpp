@@ -108,16 +108,16 @@ std::vector<T> extract_value(const libcamera::ControlValue &value)
   }
 }
 
-template<typename T, std::enable_if_t<std::is_integral<T>::value, bool> = true>
+template<typename T, std::enable_if_t<std::is_arithmetic<T>::value, bool> = true>
 rclcpp::ParameterValue control_array_to_pv(const std::vector<T> &values)
 {
   return rclcpp::ParameterValue(values);
 }
 
-template<typename T, std::enable_if_t<!std::is_integral<T>::value, bool> = true>
+template<typename T, std::enable_if_t<!std::is_arithmetic<T>::value, bool> = true>
 rclcpp::ParameterValue control_array_to_pv(const std::vector<T> & /*values*/)
 {
-  throw std::runtime_error("ParameterValue only supported for integral types");
+  throw std::runtime_error("ParameterValue only supported for arithmetic types");
 }
 
 template<typename T>
