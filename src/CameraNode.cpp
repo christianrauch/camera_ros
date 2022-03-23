@@ -437,7 +437,12 @@ CameraNode::requestComplete(libcamera::Request *request)
   // update parameters
   parameters_lock.lock();
   // TODO: only update parameters that changed
+  //  for (const auto &[id, value] : request->controls())
+  //    std::cout << "bef id: " << id << std::endl;
   request->controls() = parameters;
+  parameters.clear();
+  //  for (const auto &[id, value] : request->controls())
+  //    std::cout << "aft id: " << id << std::endl;
   parameters_lock.unlock();
 
   camera->queueRequest(request);
@@ -523,7 +528,14 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
 
       if (!value.isNone()) {
         // clamp configuration values within limits
+        //        if (id->id() == 25)
+        //          std::cout << "bef: " << value.get<libcamera::Span<const CTInteger64>>()[0] << std::endl;
         value = clamp(value, camera->controls().at(id).min(), camera->controls().at(id).max());
+        //        if (id->id() == 25)
+        //          std::cout << "aft: " << value.get<libcamera::Span<const CTInteger64>>()[0] << std::endl;
+
+        // TODO: set clamped parameter to ROS again
+        //        this->set_parameter(rclcpp::Parameter(parameter.get_name(), cv_to_pv(value)));
 
         parameters_lock.lock();
         this->parameters.set(parameter_ids.at(parameter.get_name())->id(), value);
