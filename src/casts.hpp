@@ -2,6 +2,7 @@
 #include "types.hpp"
 #include <sstream>
 
+
 template<typename T, typename F, std::enable_if_t<std::is_same<T, F>::value, bool> = true>
 const T &cast(const F &value)
 {

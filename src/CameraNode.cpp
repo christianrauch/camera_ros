@@ -1,5 +1,5 @@
 #include "clamp.hpp"
-#include "control_type_map.hpp"
+#include "cv_to_pv.hpp"
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <libcamera/camera.h>
@@ -281,7 +281,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     const libcamera::ControlValue val = clamp(val_def, val_min, val_max);
 
     // cast ControlValue to ParameterValue
-    const rclcpp::ParameterValue value = control_to_pv(val);
+    const rclcpp::ParameterValue value = cv_to_pv(val);
 
     //    std::vector<rcl_interfaces::msg::IntegerRange> ranges_int;
     //    std::vector<rcl_interfaces::msg::FloatingPointRange> ranges_float;

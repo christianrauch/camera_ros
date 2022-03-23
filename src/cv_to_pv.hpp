@@ -1,0 +1,65 @@
+#pragma once
+#include "cast_cv.hpp"
+#include <rclcpp/parameter_value.hpp>
+
+
+#define CASE_CONVERT(T)                                                                            \
+  case libcamera::ControlType##T:                                                                  \
+    return cv_to_pv(extract_value<ControlTypeMap<libcamera::ControlType##T>::type>(value));
+
+#define CASE_NONE(T)                                                                               \
+  case libcamera::ControlType##T:                                                                  \
+    return {};
+
+
+template<typename T>
+std::vector<T> extract_value(const libcamera::ControlValue &value)
+{
+  if (value.isArray()) {
+    const libcamera::Span<const T> span = value.get<libcamera::Span<const T>>();
+    return std::vector<T>(span.begin(), span.end());
+  }
+  else {
+    return {value.get<T>()};
+  }
+}
+
+template<typename T, std::enable_if_t<std::is_arithmetic<T>::value, bool> = true>
+rclcpp::ParameterValue cv_to_pv_array(const std::vector<T> &values)
+{
+  return rclcpp::ParameterValue(values);
+}
+
+template<typename T, std::enable_if_t<!std::is_arithmetic<T>::value, bool> = true>
+rclcpp::ParameterValue cv_to_pv_array(const std::vector<T> & /*values*/)
+{
+  throw std::runtime_error("ParameterValue only supported for arithmetic types");
+}
+
+template<typename T>
+rclcpp::ParameterValue cv_to_pv(const std::vector<T> &values)
+{
+  if (values.size() > 1)
+    return cv_to_pv_array(values);
+  else if (values.size() == 1)
+    return rclcpp::ParameterValue(values[0]);
+  else
+    return rclcpp::ParameterValue();
+}
+
+rclcpp::ParameterValue cv_to_pv(const libcamera::ControlValue &value)
+{
+  switch (value.type()) {
+    CASE_NONE(None)
+    CASE_CONVERT(Bool)
+    CASE_CONVERT(Byte)
+    CASE_CONVERT(Integer32)
+    CASE_CONVERT(Integer64)
+    CASE_CONVERT(Float)
+    CASE_CONVERT(String)
+    CASE_CONVERT(Rectangle)
+    CASE_CONVERT(Size)
+  }
+
+  return {};
+}

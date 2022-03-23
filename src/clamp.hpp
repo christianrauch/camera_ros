@@ -1,8 +1,15 @@
 #pragma once
-#include "control_type_map.hpp"
+#include "cv_to_pv.hpp"
 #include <libcamera/controls.h>
-#include <rclcpp/parameter_value.hpp>
 
+
+#define CASE_CLAMP(T)                                                                              \
+  case libcamera::ControlType##T:                                                                  \
+    return clamp<ControlTypeMap<libcamera::ControlType##T>::type>(value, min, max);
+
+#define CASE_NONE(T)                                                                               \
+  case libcamera::ControlType##T:                                                                  \
+    return {};
 
 namespace std
 {
@@ -61,10 +68,6 @@ libcamera::ControlValue clamp(const libcamera::ControlValue &value,
   return value;
 }
 
-//#define CASE_CLAMP(T)                                                                              \
-//  case libcamera::ControlType##T:                                                                  \
-//    return clamp<ControlTypeMap<libcamera::ControlType##T>::type>(value, min, max);
-
 libcamera::ControlValue clamp(const libcamera::ControlValue &value,
                               const libcamera::ControlValue &min,
                               const libcamera::ControlValue &max)
@@ -73,84 +76,15 @@ libcamera::ControlValue clamp(const libcamera::ControlValue &value,
     throw std::runtime_error("minimum and maximum types mismatch");
 
   switch (value.type()) {
-  case libcamera::ControlTypeNone:
-    return {};
-  case libcamera::ControlTypeBool:
-    return clamp<ControlTypeMap<libcamera::ControlTypeBool>::type>(value, min, max);
-  case libcamera::ControlTypeByte:
-    return clamp<ControlTypeMap<libcamera::ControlTypeByte>::type>(value, min, max);
-  case libcamera::ControlTypeInteger32:
-    return clamp<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(value, min, max);
-  case libcamera::ControlTypeInteger64:
-    return clamp<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(value, min, max);
-  case libcamera::ControlTypeFloat:
-    return clamp<ControlTypeMap<libcamera::ControlTypeFloat>::type>(value, min, max);
-  case libcamera::ControlTypeString:
-    return clamp<ControlTypeMap<libcamera::ControlTypeString>::type>(value, min, max);
-  case libcamera::ControlTypeRectangle:
-    return clamp<ControlTypeMap<libcamera::ControlTypeRectangle>::type>(value, min, max);
-  case libcamera::ControlTypeSize:
-    return clamp<ControlTypeMap<libcamera::ControlTypeSize>::type>(value, min, max);
-  }
-
-  return {};
-}
-
-template<typename T>
-std::vector<T> extract_value(const libcamera::ControlValue &value)
-{
-  if (value.isArray()) {
-    const libcamera::Span<const T> span = value.get<libcamera::Span<const T>>();
-    return std::vector<T>(span.begin(), span.end());
-  }
-  else {
-    return {value.get<T>()};
-  }
-}
-
-template<typename T, std::enable_if_t<std::is_arithmetic<T>::value, bool> = true>
-rclcpp::ParameterValue control_array_to_pv(const std::vector<T> &values)
-{
-  return rclcpp::ParameterValue(values);
-}
-
-template<typename T, std::enable_if_t<!std::is_arithmetic<T>::value, bool> = true>
-rclcpp::ParameterValue control_array_to_pv(const std::vector<T> & /*values*/)
-{
-  throw std::runtime_error("ParameterValue only supported for arithmetic types");
-}
-
-template<typename T>
-rclcpp::ParameterValue control_to_pv(const std::vector<T> &values)
-{
-  if (values.size() > 1)
-    return control_array_to_pv(values);
-  else if (values.size() == 1)
-    return rclcpp::ParameterValue(values[0]);
-  else
-    return rclcpp::ParameterValue();
-}
-
-#define CASE_CONVERT(T)                                                                            \
-  case libcamera::ControlType##T:                                                                  \
-    return control_to_pv(extract_value<ControlTypeMap<libcamera::ControlType##T>::type>(value));
-
-#define CASE_NONE(T)                                                                               \
-  case libcamera::ControlType##T:                                                                  \
-    return {};
-
-rclcpp::ParameterValue control_to_pv(const libcamera::ControlValue &value)
-{
-  switch (value.type()) {
     CASE_NONE(None)
-    CASE_CONVERT(Bool)
-    CASE_CONVERT(Byte)
-    CASE_CONVERT(Integer32)
-    CASE_CONVERT(Integer64)
-    CASE_CONVERT(Float)
-    CASE_CONVERT(String)
-    CASE_CONVERT(Rectangle)
-    CASE_CONVERT(Size)
+    CASE_CLAMP(Bool)
+    CASE_CLAMP(Byte)
+    CASE_CLAMP(Integer32)
+    CASE_CLAMP(Integer64)
+    CASE_CLAMP(Float)
+    CASE_CLAMP(String)
+    CASE_CLAMP(Rectangle)
+    CASE_CLAMP(Size)
   }
 
   return {};
