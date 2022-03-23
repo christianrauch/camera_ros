@@ -1,5 +1,7 @@
+#include "cast_cv.hpp"
 #include "clamp.hpp"
 #include "cv_to_pv.hpp"
+#include "types.hpp"
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <libcamera/camera.h>
