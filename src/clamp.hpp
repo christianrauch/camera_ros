@@ -29,3 +29,7 @@ T max(const libcamera::ControlValue &value)
 libcamera::ControlValue clamp(const libcamera::ControlValue &value,
                               const libcamera::ControlValue &min,
                               const libcamera::ControlValue &max);
+
+bool operator<(const libcamera::ControlValue &a, const libcamera::ControlValue &b);
+
+bool operator>(const libcamera::ControlValue &a, const libcamera::ControlValue &b);

@@ -508,29 +508,38 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
         break;
       }
 
-      // verify parameter type and dimension against default
-      const libcamera::ControlValue &ci = camera->controls().at(id).def();
-
-      if (value.type() != id->type()) {
-        result.successful = false;
-        result.reason = parameter.get_name() + ": parameter types mismatch, expected " +
-                        std::to_string(id->type()) + ", got " + std::to_string(value.type());
-        return result;
-      }
-
-      if (value.isArray() != ci.isArray() || value.numElements() != ci.numElements()) {
-        result.successful = false;
-        result.reason = parameter.get_name() + ": parameter dimensions mismatch, expected " +
-                        std::to_string(ci.numElements()) + ", got " +
-                        std::to_string(value.numElements());
-        return result;
-      }
-
       if (!value.isNone()) {
+        // verify parameter type and dimension against default
+        const libcamera::ControlInfo &ci = camera->controls().at(id);
+
+        if (value.type() != id->type()) {
+          result.successful = false;
+          result.reason = parameter.get_name() + ": parameter types mismatch, expected " +
+                          std::to_string(id->type()) + ", got " + std::to_string(value.type());
+          return result;
+        }
+
+        if (value.isArray() != ci.def().isArray() || value.numElements() != ci.def().numElements())
+        {
+          result.successful = false;
+          result.reason = parameter.get_name() + ": parameter dimensions mismatch, expected " +
+                          std::to_string(ci.def().numElements()) + ", got " +
+                          std::to_string(value.numElements());
+          return result;
+        }
+
+        // check bounds and return error
+        if (value < ci.min() || value > ci.max()) {
+          result.successful = false;
+          result.reason =
+            "parameter value " + value.toString() + " outside of range: " + ci.toString();
+          return result;
+        }
+
         // clamp configuration values within limits
         //        if (id->id() == 25)
         //          std::cout << "bef: " << value.get<libcamera::Span<const CTInteger64>>()[0] << std::endl;
-        value = clamp(value, camera->controls().at(id).min(), camera->controls().at(id).max());
+        //        value = clamp(value, camera->controls().at(id).min(), camera->controls().at(id).max());
         //        if (id->id() == 25)
         //          std::cout << "aft: " << value.get<libcamera::Span<const CTInteger64>>()[0] << std::endl;
 
