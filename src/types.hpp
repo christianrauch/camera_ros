@@ -2,6 +2,14 @@
 #include <libcamera/controls.h>
 
 
+namespace std
+{
+
+std::string to_string(const libcamera::ControlType id);
+
+} // namespace std
+
+
 // map 'ControlType' enums to C++ types
 
 template<libcamera::ControlType>

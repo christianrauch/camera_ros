@@ -67,7 +67,8 @@ libcamera::ControlValue clamp(const libcamera::ControlValue &value,
                               const libcamera::ControlValue &max)
 {
   if (min.type() != max.type())
-    throw std::runtime_error("minimum and maximum types mismatch");
+    throw std::runtime_error("minimum (" + std::to_string(min.type()) + ") and maximum (" +
+                             std::to_string(max.type()) + ") types mismatch");
 
   switch (value.type()) {
     CASE_NONE(None)

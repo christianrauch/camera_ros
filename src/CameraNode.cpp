@@ -514,8 +514,9 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
 
         if (value.type() != id->type()) {
           result.successful = false;
-          result.reason = parameter.get_name() + ": parameter types mismatch, expected " +
-                          std::to_string(id->type()) + ", got " + std::to_string(value.type());
+          result.reason = parameter.get_name() + ": parameter types mismatch, expected '" +
+                          std::to_string(id->type()) + "', got '" + std::to_string(value.type()) +
+                          "'";
           return result;
         }
 
