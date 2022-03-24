@@ -16,7 +16,7 @@
 #include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sys/mman.h>
-#include <variant>
+
 
 namespace camera
 {
@@ -85,8 +85,6 @@ const std::unordered_map<uint32_t, std::string> map_format_raw = {
 const std::unordered_map<uint32_t, std::string> map_format_compressed = {
   {libcamera::formats::MJPEG.fourcc(), "jpeg"},
 };
-
-
 
 CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options), cim(this)
 {
@@ -232,19 +230,6 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   for (const auto &[id, info] : camera->controls()) {
     // store control id with name
     parameter_ids[id->name()] = id;
-
-    std::cout << "param " << id->name() << ": " << info.toString() << " (" << info.def().toString()
-              << ") (" << id->type() << ")" << std::endl;
-    std::cout << "  values: " << info.values().size() << std::endl;
-    std::cout << "  sp def: " << info.def().data().size() << std::endl;
-    std::cout << "  sp min: " << info.min().data().size() << std::endl;
-    std::cout << "  sp max: " << info.max().data().size() << std::endl;
-    std::cout << "  array def: " << info.def().isArray() << " (" << info.def().numElements() << ")"
-              << std::endl;
-    std::cout << "  array min: " << info.min().isArray() << " (" << info.min().numElements() << ")"
-              << std::endl;
-    std::cout << "  array max: " << info.max().isArray() << " (" << info.max().numElements() << ")"
-              << std::endl;
 
     // cast all ControlValue to the type provided by the ControlId
     const libcamera::ControlValue val_def = cast_cv(info.def(), id->type());
@@ -436,13 +421,8 @@ CameraNode::requestComplete(libcamera::Request *request)
 
   // update parameters
   parameters_lock.lock();
-  // TODO: only update parameters that changed
-  //  for (const auto &[id, value] : request->controls())
-  //    std::cout << "bef id: " << id << std::endl;
   request->controls() = parameters;
   parameters.clear();
-  //  for (const auto &[id, value] : request->controls())
-  //    std::cout << "aft id: " << id << std::endl;
   parameters_lock.unlock();
 
   camera->queueRequest(request);
@@ -455,9 +435,6 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
   result.successful = true;
 
   for (const rclcpp::Parameter &parameter : parameters) {
-    std::cout << "set " << parameter.get_name() << ": " << parameter.value_to_string() << " ("
-              << parameter.get_type_name() << ")" << std::endl;
-
     if (parameter_ids.count(parameter.get_name())) {
       libcamera::ControlValue value;
       const libcamera::ControlId *id = parameter_ids.at(parameter.get_name());
@@ -536,16 +513,6 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
             "parameter value " + value.toString() + " outside of range: " + ci.toString();
           return result;
         }
-
-        // clamp configuration values within limits
-        //        if (id->id() == 25)
-        //          std::cout << "bef: " << value.get<libcamera::Span<const CTInteger64>>()[0] << std::endl;
-        //        value = clamp(value, camera->controls().at(id).min(), camera->controls().at(id).max());
-        //        if (id->id() == 25)
-        //          std::cout << "aft: " << value.get<libcamera::Span<const CTInteger64>>()[0] << std::endl;
-
-        // TODO: set clamped parameter to ROS again
-        //        this->set_parameter(rclcpp::Parameter(parameter.get_name(), cv_to_pv(value)));
 
         parameters_lock.lock();
         this->parameters.set(parameter_ids.at(parameter.get_name())->id(), value);
