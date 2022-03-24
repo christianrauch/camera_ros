@@ -49,20 +49,15 @@ libcamera::ControlValue clamp(const libcamera::ControlValue &value,
                               const libcamera::ControlValue &min,
                               const libcamera::ControlValue &max)
 {
-  if (value.isArray()) {
-    return clamp_array<T>(value, min, max);
-  }
-  else {
-    return std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
-    //    return clamp_scalar<T>(value, min, max);
-  }
+  return value.isArray() ? clamp_array<T>(value, min, max)
+                         : std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
 }
 
 template<typename T,
          std::enable_if_t<std::is_same<std::remove_cv_t<T>, CTBool>::value, bool> = true>
-libcamera::ControlValue clamp(const libcamera::ControlValue &value,
-                              const libcamera::ControlValue & /*min*/,
-                              const libcamera::ControlValue & /*max*/)
+const libcamera::ControlValue &clamp(const libcamera::ControlValue &value,
+                                     const libcamera::ControlValue & /*min*/,
+                                     const libcamera::ControlValue & /*max*/)
 {
   return value;
 }
