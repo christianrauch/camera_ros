@@ -25,13 +25,17 @@ std::vector<T> extract_value(const libcamera::ControlValue &value)
   }
 }
 
-template<typename T, std::enable_if_t<std::is_arithmetic<T>::value, bool> = true>
+template<typename T,
+         std::enable_if_t<std::is_arithmetic<T>::value || std::is_same<std::string, T>::value,
+                          bool> = true>
 rclcpp::ParameterValue cv_to_pv_array(const std::vector<T> &values)
 {
   return rclcpp::ParameterValue(values);
 }
 
-template<typename T, std::enable_if_t<!std::is_arithmetic<T>::value, bool> = true>
+template<typename T,
+         std::enable_if_t<!std::is_arithmetic<T>::value && !std::is_same<std::string, T>::value,
+                          bool> = true>
 rclcpp::ParameterValue cv_to_pv_array(const std::vector<T> & /*values*/)
 {
   throw std::runtime_error("ParameterValue only supported for arithmetic types");
