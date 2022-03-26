@@ -1,6 +1,7 @@
 #include "cast_cv.hpp"
 #include "clamp.hpp"
 #include "cv_to_pv.hpp"
+#include "pv_to_cv.hpp"
 #include "types.hpp"
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <cv_bridge/cv_bridge.h>
@@ -225,8 +226,15 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   if (!cim.setCameraName(cname))
     throw std::runtime_error("camera name must only contain alphanumeric characters");
 
+  //  // register callback to handle parameter changes
+  //  callback_parameter_change = add_on_set_parameters_callback(
+  //    std::bind(&CameraNode::onParameterChange, this, std::placeholders::_1));
+
   // dynamic camera configuration
-  std::vector<rclcpp::Parameter> parameters_initial;
+  std::vector<rclcpp::Parameter> parameters_initial; // = options.parameter_overrides();
+  // std::map<std::string, rclcpp::ParameterValue>
+  //  const auto &initial_parameters = get_node_parameters_interface()->get_parameter_overrides();
+  const auto &pp = get_node_parameters_interface()->get_parameter_overrides();
   for (const auto &[id, info] : camera->controls()) {
     // store control id with name
     parameter_ids[id->name()] = id;
@@ -274,22 +282,40 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
     std::set<unsigned int> ignore {
       // interfers with AeEnable
-      libcamera::controls::ExposureTime.id(),
+      //      libcamera::controls::ExposureTime.id(),
     };
 
+    //    const std::vector<rclcpp::Parameter> &ov = options.parameter_overrides();
+
     if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET) {
-      declare_parameter(id->name(), value, param_descr);
+      std::cout << "set " << id->name() << ", def: " << rclcpp::to_string(value) << std::endl;
+      declare_parameter(id->name(), value, param_descr, true);
+      //      declare_parameter(id->name(), value, param_descr);
       // setting the ExposureTime parameter right at the beginning causes:
       //   ERROR V4L2 [...]: Unable to set controls: Invalid argument
       //   ERROR UVC [...] Failed to set controls: -22
-      if (!ignore.count(id->id()))
-        parameters_initial.push_back(get_parameter(id->name()));
+      //      rclcpp::node_interfaces::NodeParametersInterface::SharedPtr pi = this->get_node_parameters_interface();
+
+      std::cout << "param: " << get_parameter(id->name()) << std::endl;
+      if (pp.count(id->name()))
+        parameters_initial.emplace_back(rclcpp::Parameter(id->name(), pp.at(id->name())));
+      else
+        parameters_initial.emplace_back(rclcpp::Parameter(id->name(), value));
+      //      for (parameters_initial)
+      //      if (!ignore.count(id->id()))
+      //        parameters_initial.push_back(get_parameter(id->name()));
+      // TODO: handle conflicting types
+      // TODO: handle limits
     }
   }
 
   // set initial parameters
   // TODO: find conflicting parameters
   onParameterChange(parameters_initial);
+  //  onParameterChange(options.parameter_overrides()); // parameter_overrides is empty
+
+  //  auto bla1 = options.parameter_overrides();
+  //  auto bla2 = this->get_node_parameters_interface()->get_parameter_overrides();
 
   // register callback to handle parameter changes
   callback_parameter_change = add_on_set_parameters_callback(
@@ -411,6 +437,14 @@ CameraNode::requestComplete(libcamera::Request *request)
     }
 
     pub_ci->publish(cim.getCameraInfo());
+    //    const sensor_msgs::msg::CameraInfo ci = cim.getCameraInfo();
+    //    std::cout << std::to_string(ci) << std::endl;
+    //    rosidl_typesupport_introspection_cpp::
+    //    ci.
+    //    rclcpp::Serialization<sensor_msgs::msg::CameraInfo> ser;
+    //    ser.serialize_message(,ci);
+    //    rcl_params_t *lll = rcl_yaml_node_struct_init(rcutils_get_default_allocator());
+    //    std::cout << rosidl_generator_traits::to_yaml(ci) << std::endl;
   }
   else if (request->status() == libcamera::Request::RequestCancelled) {
     RCLCPP_ERROR_STREAM(get_logger(), "request '" << request->toString() << "' cancelled");
@@ -435,55 +469,59 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
   result.successful = true;
 
   for (const rclcpp::Parameter &parameter : parameters) {
+    std::cout << "set " << parameter.get_name() << ": " << parameter.value_to_string() << " ("
+              << parameter.get_type_name() << ")" << std::endl;
+
     if (parameter_ids.count(parameter.get_name())) {
-      libcamera::ControlValue value;
       const libcamera::ControlId *id = parameter_ids.at(parameter.get_name());
-      switch (parameter.get_type()) {
-      case rclcpp::ParameterType::PARAMETER_NOT_SET:
-        break;
-      case rclcpp::ParameterType::PARAMETER_BOOL:
-        value.set(parameter.as_bool());
-        break;
-      case rclcpp::ParameterType::PARAMETER_INTEGER:
-        if (id->type() == libcamera::ControlTypeInteger32)
-          value.set(CTInteger32(parameter.as_int()));
-        else if (id->type() == libcamera::ControlTypeInteger64)
-          value.set(CTInteger64(parameter.as_int()));
-        else {
-          result.successful = false;
-          result.reason =
-            parameter.get_name() + ": invalid integer type: " + std::to_string(id->type());
-          return result;
-        }
-        break;
-      case rclcpp::ParameterType::PARAMETER_DOUBLE:
-        value.set(CTFloat(parameter.as_double()));
-        break;
-      case rclcpp::ParameterType::PARAMETER_STRING:
-        value.set(parameter.as_string());
-        break;
-      case rclcpp::ParameterType::PARAMETER_BYTE_ARRAY:
-        value.set(libcamera::Span<const CTByte>(parameter.as_byte_array()));
-        break;
-      case rclcpp::ParameterType::PARAMETER_BOOL_ARRAY:
-        result.successful = false;
-        result.reason = parameter.get_name() + ": unsupported type: " + parameter.get_type_name();
-        return result;
-      case rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY:
-        value.set(libcamera::Span<const CTInteger64>(parameter.as_integer_array()));
-        break;
-      case rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY:
-      {
-        // convert to float vector
-        const std::vector<double> &vd = parameter.as_double_array();
-        const std::vector<CTFloat> vf(vd.begin(), vd.end());
-        value.set(libcamera::Span<const CTFloat>(vf));
-        break;
-      }
-      case rclcpp::ParameterType::PARAMETER_STRING_ARRAY:
-        value.set(libcamera::Span<const CTString>(parameter.as_string_array()));
-        break;
-      }
+      libcamera::ControlValue value = pv_to_cv(parameter, id->type());
+
+      //      switch (parameter.get_type()) {
+      //      case rclcpp::ParameterType::PARAMETER_NOT_SET:
+      //        break;
+      //      case rclcpp::ParameterType::PARAMETER_BOOL:
+      //        value.set(parameter.as_bool());
+      //        break;
+      //      case rclcpp::ParameterType::PARAMETER_INTEGER:
+      //        if (id->type() == libcamera::ControlTypeInteger32)
+      //          value.set(CTInteger32(parameter.as_int()));
+      //        else if (id->type() == libcamera::ControlTypeInteger64)
+      //          value.set(CTInteger64(parameter.as_int()));
+      //        else {
+      //          result.successful = false;
+      //          result.reason =
+      //            parameter.get_name() + ": invalid integer type: " + std::to_string(id->type());
+      //          return result;
+      //        }
+      //        break;
+      //      case rclcpp::ParameterType::PARAMETER_DOUBLE:
+      //        value.set(CTFloat(parameter.as_double()));
+      //        break;
+      //      case rclcpp::ParameterType::PARAMETER_STRING:
+      //        value.set(parameter.as_string());
+      //        break;
+      //      case rclcpp::ParameterType::PARAMETER_BYTE_ARRAY:
+      //        value.set(libcamera::Span<const CTByte>(parameter.as_byte_array()));
+      //        break;
+      //      case rclcpp::ParameterType::PARAMETER_BOOL_ARRAY:
+      //        result.successful = false;
+      //        result.reason = parameter.get_name() + ": unsupported type: " + parameter.get_type_name();
+      //        return result;
+      //      case rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY:
+      //        value.set(libcamera::Span<const CTInteger64>(parameter.as_integer_array()));
+      //        break;
+      //      case rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY:
+      //      {
+      //        // convert to float vector
+      //        const std::vector<double> &vd = parameter.as_double_array();
+      //        const std::vector<CTFloat> vf(vd.begin(), vd.end());
+      //        value.set(libcamera::Span<const CTFloat>(vf));
+      //        break;
+      //      }
+      //      case rclcpp::ParameterType::PARAMETER_STRING_ARRAY:
+      //        value.set(libcamera::Span<const CTString>(parameter.as_string_array()));
+      //        break;
+      //      }
 
       if (!value.isNone()) {
         // verify parameter type and dimension against default
@@ -506,38 +544,39 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
           return result;
         }
 
-        // check bounds and return error
-        if (value < ci.min() || value > ci.max()) {
-          result.successful = false;
-          result.reason =
-            "parameter value " + value.toString() + " outside of range: " + ci.toString();
-          return result;
-        }
+        //        // check bounds and return error
+        //        if (value < ci.min() || value > ci.max()) {
+        //          result.successful = false;
+        //          result.reason =
+        //            "parameter value " + value.toString() + " outside of range: " + ci.toString();
+        //          return result;
+        //        }
 
         parameters_lock.lock();
+        std::cout << "set cam: " << value.toString() << std::endl;
         this->parameters.set(parameter_ids.at(parameter.get_name())->id(), value);
         //        libcamera::ControlValidator val;
         //        libcamera::controls::controls;
         // TODO: use 'ControlValidator' for ControlList parameters ?
 
-        // exposure -> disable AE
-        if (parameter_ids.at(parameter.get_name())->id() ==
-              libcamera::controls::ExposureTime.id() &&
-            this->parameters.contains(libcamera::controls::AeEnable) &&
-            this->parameters.get(libcamera::controls::AeEnable))
-        {
-          this->parameters.set(libcamera::controls::AeEnable, false);
-        }
+        //        // exposure -> disable AE
+        //        if (parameter_ids.at(parameter.get_name())->id() ==
+        //              libcamera::controls::ExposureTime.id() &&
+        //            this->parameters.contains(libcamera::controls::AeEnable) &&
+        //            this->parameters.get(libcamera::controls::AeEnable))
+        //        {
+        //          this->parameters.set(libcamera::controls::AeEnable, false);
+        //        }
 
-        // AE -> remove exposure
-        if (parameter_ids.at(parameter.get_name())->id() == libcamera::controls::AeEnable.id() &&
-            parameter.as_bool() && this->parameters.contains(libcamera::controls::ExposureTime))
-        {
-          // TODO: remove exposure
-          //          this->parameters.idMap()->at(libcamera::controls::ExposureTime.id());
-          //          this->parameters = libcamera::controls::controls; // ??
-          //          this->parameters.set(libcamera::controls::ExposureTime, int32_t {});
-        }
+        //        // AE -> remove exposure
+        //        if (parameter_ids.at(parameter.get_name())->id() == libcamera::controls::AeEnable.id() &&
+        //            parameter.as_bool() && this->parameters.contains(libcamera::controls::ExposureTime))
+        //        {
+        //          // TODO: remove exposure
+        //          //          this->parameters.idMap()->at(libcamera::controls::ExposureTime.id());
+        //          //          this->parameters = libcamera::controls::controls; // ??
+        //          //          this->parameters.set(libcamera::controls::ExposureTime, int32_t {});
+        //        }
 
         parameters_lock.unlock();
       }
