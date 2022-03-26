@@ -4,8 +4,8 @@
 
 namespace std
 {
-
-std::string to_string(const libcamera::ControlType id);
+std::string
+to_string(const libcamera::ControlType id);
 
 } // namespace std
 

@@ -12,8 +12,8 @@
 
 namespace std
 {
-
-CTRectangle clamp(const CTRectangle &val, const CTRectangle &lo, const CTRectangle &hi)
+CTRectangle
+clamp(const CTRectangle &val, const CTRectangle &lo, const CTRectangle &hi)
 {
   const int x = std::clamp(val.x, lo.x, hi.x);
   const int y = std::clamp(val.y, lo.y, hi.y);
@@ -27,9 +27,9 @@ CTRectangle clamp(const CTRectangle &val, const CTRectangle &lo, const CTRectang
 
 
 template<typename T>
-libcamera::ControlValue clamp_array(const libcamera::ControlValue &value,
-                                    const libcamera::ControlValue &min,
-                                    const libcamera::ControlValue &max)
+libcamera::ControlValue
+clamp_array(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
+            const libcamera::ControlValue &max)
 {
   const libcamera::Span<const T> v = value.get<libcamera::Span<const T>>();
   const libcamera::Span<const T> a = min.get<libcamera::Span<const T>>();
@@ -45,9 +45,9 @@ libcamera::ControlValue clamp_array(const libcamera::ControlValue &value,
 
 template<typename T,
          std::enable_if_t<!std::is_same<std::remove_cv_t<T>, CTBool>::value, bool> = true>
-libcamera::ControlValue clamp(const libcamera::ControlValue &value,
-                              const libcamera::ControlValue &min,
-                              const libcamera::ControlValue &max)
+libcamera::ControlValue
+clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
+      const libcamera::ControlValue &max)
 {
   return value.isArray() ? clamp_array<T>(value, min, max)
                          : std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
@@ -55,16 +55,16 @@ libcamera::ControlValue clamp(const libcamera::ControlValue &value,
 
 template<typename T,
          std::enable_if_t<std::is_same<std::remove_cv_t<T>, CTBool>::value, bool> = true>
-const libcamera::ControlValue &clamp(const libcamera::ControlValue &value,
-                                     const libcamera::ControlValue & /*min*/,
-                                     const libcamera::ControlValue & /*max*/)
+const libcamera::ControlValue &
+clamp(const libcamera::ControlValue &value, const libcamera::ControlValue & /*min*/,
+      const libcamera::ControlValue & /*max*/)
 {
   return value;
 }
 
-libcamera::ControlValue clamp(const libcamera::ControlValue &value,
-                              const libcamera::ControlValue &min,
-                              const libcamera::ControlValue &max)
+libcamera::ControlValue
+clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
+      const libcamera::ControlValue &max)
 {
   if (min.type() != max.type())
     throw std::runtime_error("minimum (" + std::to_string(min.type()) + ") and maximum (" +
@@ -86,14 +86,16 @@ libcamera::ControlValue clamp(const libcamera::ControlValue &value,
 }
 
 
-bool operator<(const libcamera::Rectangle &lhs, const libcamera::Rectangle &rhs)
+bool
+operator<(const libcamera::Rectangle &lhs, const libcamera::Rectangle &rhs)
 {
   // check if lhs rectangle is completely enclosed by rhs rectangle
   return lhs.x > rhs.x && lhs.y > rhs.y && (lhs.x + lhs.width) < (rhs.x + rhs.width) &&
          (lhs.y + lhs.height) < (rhs.y + rhs.height);
 }
 
-bool operator>(const libcamera::Rectangle &lhs, const libcamera::Rectangle &rhs)
+bool
+operator>(const libcamera::Rectangle &lhs, const libcamera::Rectangle &rhs)
 {
   // check if lhs rectangle completely enclosed the rhs rectangle
   return lhs.x < rhs.x && lhs.y < rhs.y && (lhs.x + lhs.width) > (rhs.x + rhs.width) &&
@@ -101,7 +103,8 @@ bool operator>(const libcamera::Rectangle &lhs, const libcamera::Rectangle &rhs)
 }
 
 template<typename T>
-bool less(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs)
+bool
+less(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs)
 {
   if (lhs.isArray()) {
     const libcamera::Span<const T> va = lhs.get<libcamera::Span<const T>>();
@@ -118,7 +121,8 @@ bool less(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs
 }
 
 template<typename T>
-bool greater(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs)
+bool
+greater(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs)
 {
   if (lhs.isArray()) {
     const libcamera::Span<const T> va = lhs.get<libcamera::Span<const T>>();
@@ -142,7 +146,8 @@ bool greater(const libcamera::ControlValue &lhs, const libcamera::ControlValue &
   case libcamera::ControlType##T:                                                                  \
     return greater<ControlTypeMap<libcamera::ControlType##T>::type>(lhs, rhs);
 
-bool operator<(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs)
+bool
+operator<(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs)
 {
   assert(lhs.type() == rhs.type() && lhs.numElements() == rhs.numElements());
 
@@ -162,7 +167,8 @@ bool operator<(const libcamera::ControlValue &lhs, const libcamera::ControlValue
   return {};
 }
 
-bool operator>(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs)
+bool
+operator>(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs)
 {
   assert(lhs.type() == rhs.type() && lhs.numElements() == rhs.numElements());
 

@@ -23,8 +23,8 @@
 //  return libcamera::Span<const T>(std::vector<T>(values.begin(), values.end()));
 //}
 
-libcamera::ControlValue pv_to_cv_int_array(const std::vector<int64_t> &values,
-                                           const libcamera::ControlType &type)
+libcamera::ControlValue
+pv_to_cv_int_array(const std::vector<int64_t> &values, const libcamera::ControlType &type)
 {
   // convert to Span (Integer32, Integer64) or geometric type Rectangle, Size
   switch (type) {
@@ -44,8 +44,8 @@ libcamera::ControlValue pv_to_cv_int_array(const std::vector<int64_t> &values,
   return {};
 }
 
-libcamera::ControlValue pv_to_cv(const rclcpp::Parameter &parameter,
-                                 const libcamera::ControlType &type)
+libcamera::ControlValue
+pv_to_cv(const rclcpp::Parameter &parameter, const libcamera::ControlType &type)
 {
   //  const std::string &name = parameter.get_name();
 

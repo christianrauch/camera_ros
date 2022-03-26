@@ -23,7 +23,8 @@ template<typename F, typename T,
                               std::is_same<std::remove_cv_t<F>, CTSize>::value ||
                               std::is_same<std::remove_cv_t<T>, CTSize>::value),
                           bool> = true>
-libcamera::ControlValue cast_cv(const libcamera::ControlValue &value)
+libcamera::ControlValue
+cast_cv(const libcamera::ControlValue &value)
 {
   if (value.isArray()) {
     std::vector<T> a;
@@ -42,7 +43,8 @@ template<typename F, typename T,
                             !(std::is_same<std::remove_cv_t<F>, CTRectangle>::value ||
                               std::is_same<std::remove_cv_t<F>, CTSize>::value),
                           bool> = true>
-libcamera::ControlValue cast_cv(const libcamera::ControlValue &value)
+libcamera::ControlValue
+cast_cv(const libcamera::ControlValue &value)
 {
   if (value.isArray())
     throw std::runtime_error("unsupported array conversion for CTBool");
@@ -53,7 +55,8 @@ libcamera::ControlValue cast_cv(const libcamera::ControlValue &value)
 template<
   typename F, typename T,
   std::enable_if_t<std::is_same<std::remove_cv_t<F>, std::remove_cv_t<T>>::value, bool> = true>
-const libcamera::ControlValue &cast_cv(const libcamera::ControlValue &value)
+const libcamera::ControlValue &
+cast_cv(const libcamera::ControlValue &value)
 {
   return value;
 }
@@ -65,13 +68,15 @@ template<typename F, typename T,
                              std::is_same<std::remove_cv_t<F>, CTSize>::value ||
                              std::is_same<std::remove_cv_t<T>, CTSize>::value),
                           bool> = true>
-libcamera::ControlValue cast_cv(const libcamera::ControlValue & /*value*/)
+libcamera::ControlValue
+cast_cv(const libcamera::ControlValue & /*value*/)
 {
   throw std::runtime_error("unsupported ControlValue cast");
 }
 
 template<typename T>
-libcamera::ControlValue cast_cv(const libcamera::ControlValue &value)
+libcamera::ControlValue
+cast_cv(const libcamera::ControlValue &value)
 {
   switch (value.type()) {
     CASE_NONE(None)
@@ -88,8 +93,8 @@ libcamera::ControlValue cast_cv(const libcamera::ControlValue &value)
   return {};
 }
 
-libcamera::ControlValue cast_cv(const libcamera::ControlValue &value,
-                                const libcamera::ControlType target_type)
+libcamera::ControlValue
+cast_cv(const libcamera::ControlValue &value, const libcamera::ControlType target_type)
 {
   switch (target_type) {
     CASE_NONE(None)

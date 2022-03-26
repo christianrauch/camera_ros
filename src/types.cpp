@@ -5,7 +5,8 @@
   case libcamera::ControlType##T:                                                                  \
     return #T;
 
-std::string std::to_string(const libcamera::ControlType id)
+std::string
+std::to_string(const libcamera::ControlType id)
 {
   switch (id) {
     CASE_TYPE(None)

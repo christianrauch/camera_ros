@@ -14,7 +14,8 @@
 
 
 template<typename T>
-std::vector<T> extract_value(const libcamera::ControlValue &value)
+std::vector<T>
+extract_value(const libcamera::ControlValue &value)
 {
   if (value.isArray()) {
     const libcamera::Span<const T> span = value.get<libcamera::Span<const T>>();
@@ -28,7 +29,8 @@ std::vector<T> extract_value(const libcamera::ControlValue &value)
 template<typename T,
          std::enable_if_t<std::is_arithmetic<T>::value || std::is_same<std::string, T>::value,
                           bool> = true>
-rclcpp::ParameterValue cv_to_pv_array(const std::vector<T> &values)
+rclcpp::ParameterValue
+cv_to_pv_array(const std::vector<T> &values)
 {
   return rclcpp::ParameterValue(values);
 }
@@ -36,7 +38,8 @@ rclcpp::ParameterValue cv_to_pv_array(const std::vector<T> &values)
 template<typename T,
          std::enable_if_t<!std::is_arithmetic<T>::value && !std::is_same<std::string, T>::value,
                           bool> = true>
-rclcpp::ParameterValue cv_to_pv_array(const std::vector<T> & /*values*/)
+rclcpp::ParameterValue
+cv_to_pv_array(const std::vector<T> & /*values*/)
 {
   throw std::runtime_error("ParameterValue only supported for arithmetic types");
 }
@@ -44,24 +47,28 @@ rclcpp::ParameterValue cv_to_pv_array(const std::vector<T> & /*values*/)
 template<typename T,
          std::enable_if_t<std::is_arithmetic<T>::value || std::is_same<std::string, T>::value,
                           bool> = true>
-rclcpp::ParameterValue cv_to_pv_scalar(const T &value)
+rclcpp::ParameterValue
+cv_to_pv_scalar(const T &value)
 {
   return rclcpp::ParameterValue(value);
 }
 
-rclcpp::ParameterValue cv_to_pv_scalar(const libcamera::Rectangle &rectangle)
+rclcpp::ParameterValue
+cv_to_pv_scalar(const libcamera::Rectangle &rectangle)
 {
   return rclcpp::ParameterValue(
     std::vector<int64_t> {rectangle.x, rectangle.y, rectangle.width, rectangle.height});
 }
 
-rclcpp::ParameterValue cv_to_pv_scalar(const libcamera::Size &size)
+rclcpp::ParameterValue
+cv_to_pv_scalar(const libcamera::Size &size)
 {
   return rclcpp::ParameterValue(std::vector<int64_t> {size.width, size.height});
 }
 
 template<typename T>
-rclcpp::ParameterValue cv_to_pv(const std::vector<T> &values)
+rclcpp::ParameterValue
+cv_to_pv(const std::vector<T> &values)
 {
   if (values.size() > 1)
     return cv_to_pv_array(values);
@@ -71,7 +78,8 @@ rclcpp::ParameterValue cv_to_pv(const std::vector<T> &values)
     return rclcpp::ParameterValue();
 }
 
-rclcpp::ParameterValue cv_to_pv(const libcamera::ControlValue &value)
+rclcpp::ParameterValue
+cv_to_pv(const libcamera::ControlValue &value)
 {
   switch (value.type()) {
     CASE_NONE(None)
