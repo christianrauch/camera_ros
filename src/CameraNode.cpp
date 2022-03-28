@@ -20,54 +20,101 @@
 
 
 typedef std::unordered_map<unsigned int, libcamera::ControlValue> ControlListMap;
+typedef std::map<std::string, rclcpp::ParameterValue> ParameterMap;
 
-bool
-resolve_conflicts(ControlListMap &parameters, const ControlListMap &state)
+//bool
+//resolve_conflicts(ControlListMap &parameters, const ControlListMap &state)
+//{
+//  std::cout << "parameters" << std::endl;
+//  for (const auto &[id, value] : parameters) {
+//    std::cout << id << ": " << value.toString() << std::endl;
+//  }
+
+//  std::cout << "state" << std::endl;
+//  for (const auto &[id, value] : state) {
+//    std::cout << id << ": " << value.toString() << std::endl;
+//  }
+
+//  bool ok = true;
+
+//  // auto exposure (AeEnable) and manual exposure (ExposureTime)
+//  // must not be enabled at the same time
+//  if (parameters.count(libcamera::controls::AeEnable.id()) &&
+//      parameters.count(libcamera::controls::ExposureTime.id()))
+//  {
+//    std::cout << "ignoring manually setexposure time" << std::endl;
+//    parameters.erase(libcamera::controls::ExposureTime.id());
+//    ok = false;
+//  }
+
+//  // ExposureTime must not be set while AeEnable is true
+//  // disable AeEnable when ExposureTime is set
+//  if (parameters.count(libcamera::controls::ExposureTime.id()) &&
+//      state.count(libcamera::controls::AeEnable.id()) &&
+//      state.at(libcamera::controls::AeEnable.id()).get<bool>())
+//  {
+//    std::cout << "disable AE" << std::endl;
+//    parameters[libcamera::controls::AeEnable.id()].set(false);
+//    ok = false;
+//  }
+
+//  // remove ExposureTime when AeEnable is enabled
+//  if (parameters.count(libcamera::controls::AeEnable.id()) &&
+//      parameters.at(libcamera::controls::AeEnable.id()).get<bool>() &&
+//      state.count(libcamera::controls::ExposureTime.id()))
+//  {
+//    std::cout << "remove exposure" << std::endl;
+//    parameters.erase(libcamera::controls::ExposureTime.id());
+//    ok = false;
+//  }
+
+//  return ok;
+//}
+
+ParameterMap
+parameter_list_to_map(const std::vector<rclcpp::Parameter> &parameters)
 {
-  std::cout << "parameters" << std::endl;
-  for (const auto &[id, value] : parameters) {
-    std::cout << id << ": " << value.toString() << std::endl;
-  }
+  ParameterMap parameter_map;
+  for (const auto &p : parameters)
+    parameter_map[p.get_name()] = p.get_parameter_value();
+  return parameter_map;
+}
 
-  std::cout << "state" << std::endl;
-  for (const auto &[id, value] : state) {
-    std::cout << id << ": " << value.toString() << std::endl;
-  }
-
-  bool ok = true;
-
+std::string
+resolve_conflicts(ParameterMap &parameters)
+{
   // auto exposure (AeEnable) and manual exposure (ExposureTime)
   // must not be enabled at the same time
-  if (parameters.count(libcamera::controls::AeEnable.id()) &&
-      parameters.count(libcamera::controls::ExposureTime.id()))
+  if (parameters.count("AeEnable") && parameters.at("AeEnable").get<bool>() &&
+      parameters.count("ExposureTime"))
   {
-    std::cout << "ignoring manually setexposure time" << std::endl;
-    parameters.erase(libcamera::controls::ExposureTime.id());
-    ok = false;
+    // disable auto exposure
+    parameters.at("AeEnable") = rclcpp::ParameterValue(false);
+    return "AeEnable and ExposureTime must not be enabled at the same time, set 'AeEnable' to off";
   }
+  return {};
+}
+
+rcl_interfaces::msg::SetParametersResult
+check_conflicts(const std::vector<rclcpp::Parameter> &parameters,
+                const ParameterMap &parameters_full)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+
+  ParameterMap parameter_map;
+  for (const auto &p : parameters)
+    parameter_map[p.get_name()] = p.get_parameter_value();
+  for (const auto &[name, value] : parameters_full)
+    parameter_map[name] = value;
 
   // ExposureTime must not be set while AeEnable is true
-  // disable AeEnable when ExposureTime is set
-  if (parameters.count(libcamera::controls::ExposureTime.id()) &&
-      state.count(libcamera::controls::AeEnable.id()) &&
-      state.at(libcamera::controls::AeEnable.id()).get<bool>())
-  {
-    std::cout << "disable AE" << std::endl;
-    parameters[libcamera::controls::AeEnable.id()].set(false);
-    ok = false;
-  }
+  if (parameter_map.count("AeEnable") && parameter_map.at("AeEnable").get<bool>() &&
+      parameter_map.count("ExposureTime"))
+    result.reason = "AeEnable and ExposureTime must not be set simultaneously";
 
-  // remove ExposureTime when AeEnable is enabled
-  if (parameters.count(libcamera::controls::AeEnable.id()) &&
-      parameters.at(libcamera::controls::AeEnable.id()).get<bool>() &&
-      state.count(libcamera::controls::ExposureTime.id()))
-  {
-    std::cout << "remove exposure" << std::endl;
-    parameters.erase(libcamera::controls::ExposureTime.id());
-    ok = false;
-  }
+  result.successful = result.reason.empty();
 
-  return ok;
+  return result;
 }
 
 namespace camera
@@ -102,8 +149,9 @@ private:
   ControlListMap parameters;
   //  libcamera::ControlList parameters;
   // keep track of set parameters
+  ParameterMap parameters_full;
   //  std::unordered_map<const libcamera::ControlId *, libcamera::ControlValue> parameters_set;
-  ControlListMap parameters_set;
+  //  ControlListMap parameters_set;
   std::mutex parameters_lock;
 
   void
@@ -282,11 +330,13 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   if (!cim.setCameraName(cname))
     throw std::runtime_error("camera name must only contain alphanumeric characters");
 
-  // register callback to handle parameter changes
-  callback_parameter_change = add_on_set_parameters_callback(
-    std::bind(&CameraNode::onParameterChange, this, std::placeholders::_1));
+  //  // register callback to handle parameter changes
+  //  callback_parameter_change = add_on_set_parameters_callback(
+  //    std::bind(&CameraNode::onParameterChange, this, std::placeholders::_1));
 
   // dynamic camera configuration
+  //  std::vector<rclcpp::Parameter> parameters_default;
+  ParameterMap parameters_init;
   for (const auto &[id, info] : camera->controls()) {
     // store control id with name
     parameter_ids[id->name()] = id;
@@ -342,8 +392,39 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET) {
       std::cout << "declare " << id->name() << ", def: " << rclcpp::to_string(value) << std::endl;
       declare_parameter(id->name(), value, param_descr);
+      //      declare_parameter(id->name(), value.get_type(), param_descr, true);
+      parameters_init[id->name()] = value;
+      //      parameters_default.emplace_back(id->name(), value);
     }
   }
+
+  std::cout << "parameter declare DONE" << std::endl;
+
+  // register callback to handle parameter changes
+  // We have to register the callback after parameter declaration
+  // to avoid callbacks interering with the default parameter check.
+  callback_parameter_change = add_on_set_parameters_callback(
+    std::bind(&CameraNode::onParameterChange, this, std::placeholders::_1));
+
+  // resolve conflicts of default libcamera configuration
+  resolve_conflicts(parameters_init);
+
+  // apply parameter overrides
+  for (const auto &[name, value] : get_node_parameters_interface()->get_parameter_overrides())
+    parameters_init[name] = value;
+
+  // resolve conflicts of provied configuration
+  const std::string msg = resolve_conflicts(parameters_init);
+  if (!msg.empty())
+    RCLCPP_WARN_STREAM(get_logger(), msg);
+
+  std::vector<rclcpp::Parameter> p;
+  //  std::transform(p.begin(), p.end(), parameters_default.begin(), );
+  for (const auto &[name, value] : parameters_init)
+    p.emplace_back(name, value);
+  set_parameters(p);
+
+  std::cout << "parameter set DONE" << std::endl;
 
   // allocate stream buffers and create one request per buffer
   libcamera::Stream *stream = scfg.stream();
@@ -466,16 +547,6 @@ CameraNode::requestComplete(libcamera::Request *request)
     RCLCPP_ERROR_STREAM(get_logger(), "request '" << request->toString() << "' cancelled");
   }
 
-  //  std::cout << "req: " << request->toString() << "controls" << std::endl;
-  //  for (const auto &[id, value] : request->controls()) {
-  //    std::cout << id << ": " << value.toString() << std::endl;
-  //  }
-
-  //  std::cout << "req: " << request->toString() << "metadata" << std::endl;
-  //  for (const auto &[id, value] : request->metadata()) {
-  //    std::cout << id << ": " << value.toString() << std::endl;
-  //  }
-
   // queue the request again for the next frame
   request->reuse(libcamera::Request::ReuseBuffers);
 
@@ -496,10 +567,27 @@ rcl_interfaces::msg::SetParametersResult
 CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
 {
   rcl_interfaces::msg::SetParametersResult result;
+
+  //  this->get_parameters();
+  //  this->list_parameters();
+  //  this->get_node_parameters_interface()->
+
+  // set of old and new parameters
+  //  ParameterMap params_full;
+  //  for (const auto &[name, id] : parameter_ids)
+  //    params_full[name] = get_parameter(name).get_parameter_value();
+  //  for (const auto &parameter : parameters)
+  //    params_full[parameter.get_name()] = parameter.get_parameter_value();
+
+  //  ParameterMap params = parameter_list_to_map(parameters);
+  result = check_conflicts(parameters, parameters_full);
+  if (!result.successful)
+    return result;
+
   result.successful = true;
 
   for (const rclcpp::Parameter &parameter : parameters) {
-    std::cout << "set " << parameter.get_name() << ": " << parameter.value_to_string() << " ("
+    std::cout << "set cb " << parameter.get_name() << ": " << parameter.value_to_string() << " ("
               << parameter.get_type_name() << ")" << std::endl;
 
     if (parameter_ids.count(parameter.get_name())) {
@@ -543,10 +631,11 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
         //        libcamera::controls::controls;
         // TODO: use 'ControlValidator' for ControlList parameters ?
 
-        if (!resolve_conflicts(this->parameters, this->parameters_set)) {
-          RCLCPP_WARN_STREAM(get_logger(),
-                             "conflicting parameters have been resolved automatically");
-        }
+        // TODO: it would be good if we could update the ROS parameters too
+        //        if (!resolve_conflicts(this->parameters, this->parameters_set)) {
+        //          RCLCPP_WARN_STREAM(get_logger(),
+        //                             "conflicting parameters have been resolved automatically");
+        //        }
 
         //        // exposure -> disable AE
         //        if (parameter_ids.at(parameter.get_name())->id() ==
@@ -571,9 +660,11 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
         //          //        parameters_set.
         //        }
 
-        parameters_set.merge(this->parameters);
+        //        parameters_set.merge(this->parameters);
 
         parameters_lock.unlock();
+
+        parameters_full[parameter.get_name()] = parameter.get_parameter_value();
       }
     }
   }
