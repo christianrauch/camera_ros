@@ -39,20 +39,30 @@ resolve_conflicts(ParameterMap &parameters)
 }
 
 rcl_interfaces::msg::SetParametersResult
-check_conflicts(const std::vector<rclcpp::Parameter> &parameters,
+check_conflicts(const std::vector<rclcpp::Parameter> &parameters_new,
                 const ParameterMap &parameters_full)
 {
   rcl_interfaces::msg::SetParametersResult result;
 
   ParameterMap parameter_map;
-  for (const auto &p : parameters)
-    parameter_map[p.get_name()] = p.get_parameter_value();
+  // old configuration state
   for (const auto &[name, value] : parameters_full)
     parameter_map[name] = value;
+  // apply new configuration update
+  for (const auto &p : parameters_new)
+    parameter_map[p.get_name()] = p.get_parameter_value();
+
+  // is auto exposure going to be enabled?
+  const bool ae_enabled =
+    parameter_map.count("AeEnable") && parameter_map.at("AeEnable").get<bool>();
+  // are new parameters setting the exposure manually?
+  const bool exposure_updated =
+    std::find_if(parameters_new.begin(), parameters_new.end(), [](const rclcpp::Parameter &param) {
+      return param.get_name() == "ExposureTime";
+    }) != parameters_new.end();
 
   // ExposureTime must not be set while AeEnable is true
-  if (parameter_map.count("AeEnable") && parameter_map.at("AeEnable").get<bool>() &&
-      parameter_map.count("ExposureTime"))
+  if (ae_enabled && exposure_updated)
     result.reason = "AeEnable and ExposureTime must not be set simultaneously";
 
   result.successful = result.reason.empty();
@@ -325,6 +335,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
     // declare parameters and set default or initial value
     if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET) {
+      RCLCPP_DEBUG_STREAM(get_logger(),
+                          "declare " << id->name() << " with default " << rclcpp::to_string(value));
       declare_parameter(id->name(), value, param_descr);
       parameters_init[id->name()] = value;
     }
@@ -501,11 +513,9 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
   result.successful = true;
 
   for (const rclcpp::Parameter &parameter : parameters) {
-    std::cout << "set cb " << parameter.get_name() << ": " << parameter.value_to_string() << " ("
-              << parameter.get_type_name() << ")" << std::endl;
-    //    RCLCPP_DEBUG_STREAM(get_logger(), "set cb " << parameter.get_name() << ": "
-    //                                                << parameter.value_to_string() << " ("
-    //                                                << parameter.get_type_name() << ")");
+    RCLCPP_DEBUG_STREAM(get_logger(), "setting " << parameter.get_type_name() << " parameter "
+                                                 << parameter.get_name() << " to "
+                                                 << parameter.value_to_string());
 
     if (parameter_ids.count(parameter.get_name())) {
       const libcamera::ControlId *id = parameter_ids.at(parameter.get_name());
