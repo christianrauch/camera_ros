@@ -24,6 +24,7 @@ add_library(utils STATIC
   src/cast_cv.cpp
   src/clamp.cpp
   src/cv_to_pv.cpp
+  src/pv_to_cv.cpp
   src/types.cpp
 )
 target_include_directories(utils PUBLIC ${libcamera_INCLUDE_DIRS})
