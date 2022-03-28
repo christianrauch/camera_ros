@@ -38,7 +38,8 @@ private:
 
   camera_info_manager::CameraInfoManager cim;
 
-  void requestComplete(libcamera::Request *request);
+  void
+  requestComplete(libcamera::Request *request);
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(camera::CameraNode)
@@ -255,7 +256,8 @@ CameraNode::~CameraNode()
   camera_manager.stop();
 }
 
-void CameraNode::requestComplete(libcamera::Request *request)
+void
+CameraNode::requestComplete(libcamera::Request *request)
 {
   if (request->status() == libcamera::Request::RequestCancelled)
     return;
