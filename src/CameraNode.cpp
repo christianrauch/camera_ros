@@ -105,6 +105,9 @@ private:
   std::mutex parameters_lock;
 
   void
+  declareParameters();
+
+  void
   requestComplete(libcamera::Request *request);
 
   rcl_interfaces::msg::SetParametersResult
@@ -280,6 +283,48 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   if (!cim.setCameraName(cname))
     throw std::runtime_error("camera name must only contain alphanumeric characters");
 
+  declareParameters();
+
+  // allocate stream buffers and create one request per buffer
+  libcamera::Stream *stream = scfg.stream();
+
+  allocator = std::make_shared<libcamera::FrameBufferAllocator>(camera);
+  allocator->allocate(stream);
+
+  for (const std::unique_ptr<libcamera::FrameBuffer> &buffer : allocator->buffers(stream)) {
+    std::unique_ptr<libcamera::Request> request = camera->createRequest();
+    if (!request)
+      throw std::runtime_error("Can't create request");
+
+    if (request->addBuffer(stream, buffer.get()) < 0)
+      throw std::runtime_error("Can't set buffer for request");
+
+    requests.push_back(std::move(request));
+  }
+
+  // register callback
+  camera->requestCompleted.connect(this, &CameraNode::requestComplete);
+
+  // start camera and queue all requests
+  if (camera->start())
+    throw std::runtime_error("failed to start camera");
+
+  for (std::unique_ptr<libcamera::Request> &request : requests)
+    camera->queueRequest(request.get());
+}
+
+CameraNode::~CameraNode()
+{
+  if (camera->stop())
+    std::cerr << "failed to stop camera" << std::endl;
+  camera->requestCompleted.disconnect();
+  camera->release();
+  camera_manager.stop();
+}
+
+void
+CameraNode::declareParameters()
+{
   // dynamic camera configuration
   ParameterMap parameters_init;
   for (const auto &[id, info] : camera->controls()) {
@@ -364,42 +409,6 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   for (const auto &[name, value] : parameters_init)
     parameters_init_list.emplace_back(name, value);
   set_parameters(parameters_init_list);
-
-  // allocate stream buffers and create one request per buffer
-  libcamera::Stream *stream = scfg.stream();
-
-  allocator = std::make_shared<libcamera::FrameBufferAllocator>(camera);
-  allocator->allocate(stream);
-
-  for (const std::unique_ptr<libcamera::FrameBuffer> &buffer : allocator->buffers(stream)) {
-    std::unique_ptr<libcamera::Request> request = camera->createRequest();
-    if (!request)
-      throw std::runtime_error("Can't create request");
-
-    if (request->addBuffer(stream, buffer.get()) < 0)
-      throw std::runtime_error("Can't set buffer for request");
-
-    requests.push_back(std::move(request));
-  }
-
-  // register callback
-  camera->requestCompleted.connect(this, &CameraNode::requestComplete);
-
-  // start camera and queue all requests
-  if (camera->start())
-    throw std::runtime_error("failed to start camera");
-
-  for (std::unique_ptr<libcamera::Request> &request : requests)
-    camera->queueRequest(request.get());
-}
-
-CameraNode::~CameraNode()
-{
-  if (camera->stop())
-    std::cerr << "failed to stop camera" << std::endl;
-  camera->requestCompleted.disconnect();
-  camera->release();
-  camera_manager.stop();
 }
 
 void
