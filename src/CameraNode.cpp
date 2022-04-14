@@ -2,6 +2,7 @@
 #include "clamp.hpp"
 #include "cv_to_pv.hpp"
 #include "pv_to_cv.hpp"
+#include "type_extent.hpp"
 #include "types.hpp"
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <cv_bridge/cv_bridge.h>
@@ -330,6 +331,8 @@ CameraNode::declareParameters()
   for (const auto &[id, info] : camera->controls()) {
     // store control id with name
     parameter_ids[id->name()] = id;
+
+    std::cout << "control " << id->name() << ", extend: " << get_extent(id) << std::endl;
 
     // cast all ControlValue to the type provided by the ControlId
     const libcamera::ControlValue val_def = cast_cv(info.def(), id->type());

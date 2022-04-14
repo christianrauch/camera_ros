@@ -26,6 +26,7 @@ add_library(utils STATIC
   src/cv_to_pv.cpp
   src/pv_to_cv.cpp
   src/types.cpp
+  src/type_extent.cpp
 )
 target_include_directories(utils PUBLIC ${libcamera_INCLUDE_DIRS})
 ament_target_dependencies(
