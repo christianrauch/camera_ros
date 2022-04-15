@@ -4,4 +4,4 @@
 
 
 rclcpp::ParameterValue
-cv_to_pv(const libcamera::ControlValue &value);
+cv_to_pv(const libcamera::ControlValue &value, const std::size_t &extent);

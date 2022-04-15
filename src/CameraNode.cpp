@@ -332,7 +332,8 @@ CameraNode::declareParameters()
     // store control id with name
     parameter_ids[id->name()] = id;
 
-    std::cout << "control " << id->name() << ", extend: " << get_extent(id) << std::endl;
+    const std::size_t extent = get_extent(id);
+    std::cout << "control " << id->name() << ", extend: " << extent << std::endl;
 
     // cast all ControlValue to the type provided by the ControlId
     const libcamera::ControlValue val_def = cast_cv(info.def(), id->type());
@@ -351,7 +352,7 @@ CameraNode::declareParameters()
       throw std::runtime_error("minimum and maximum parameter array sizes do not match");
 
     // clamp default ControlValue to min/max range and cast ParameterValue
-    const rclcpp::ParameterValue value = cv_to_pv(clamp(val_def, val_min, val_max));
+    const rclcpp::ParameterValue value = cv_to_pv(clamp(val_def, val_min, val_max), extent);
 
     // get smallest bounds for minimum and maximum set
     rcl_interfaces::msg::IntegerRange range_int;
