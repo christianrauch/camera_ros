@@ -19,6 +19,10 @@
 #include <sensor_msgs/msg/image.hpp>
 #include <sys/mman.h>
 
+// bugs:
+// TODO: memory leaks
+// TODO: default "declare AeEnable with default true" but "ros2 param get camera AeEnable" returns "False" and does not appear to be set on
+
 
 typedef std::unordered_map<unsigned int, libcamera::ControlValue> ControlListMap;
 typedef std::map<std::string, rclcpp::ParameterValue> ParameterMap;
@@ -334,6 +338,8 @@ CameraNode::declareParameters()
 
     const std::size_t extent = get_extent(id);
     std::cout << "control " << id->name() << ", extend: " << extent << std::endl;
+
+    // TODO: conver scalar to span control value and store for later comparison?
 
     // cast all ControlValue to the type provided by the ControlId
     const libcamera::ControlValue val_def = cast_cv(info.def(), id->type());
