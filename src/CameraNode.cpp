@@ -21,26 +21,43 @@
 
 // bugs:
 // TODO: memory leaks
-// TODO: default "declare AeEnable with default true" but "ros2 param get camera AeEnable" returns "False" and does not appear to be set on
 
 
 typedef std::unordered_map<unsigned int, libcamera::ControlValue> ControlListMap;
 typedef std::map<std::string, rclcpp::ParameterValue> ParameterMap;
 
 
-std::string
-resolve_conflicts(ParameterMap &parameters)
+std::tuple<ParameterMap, std::string>
+resolve_conflicts(const ParameterMap &parameters_default, const ParameterMap &parameters_overrides)
 {
+  ParameterMap parameters_init = parameters_default;
+  std::string msg;
+
   // auto exposure (AeEnable) and manual exposure (ExposureTime)
   // must not be enabled at the same time
-  if (parameters.count("AeEnable") && parameters.at("AeEnable").get<bool>() &&
-      parameters.count("ExposureTime"))
+
+  // default: prefer auto exposure
+  if (parameters_init.count("AeEnable") && parameters_init.at("AeEnable").get<bool>() &&
+      parameters_init.count("ExposureTime"))
   {
-    // disable auto exposure
-    parameters.at("AeEnable") = rclcpp::ParameterValue(false);
-    return "AeEnable and ExposureTime must not be enabled at the same time, set 'AeEnable' to off";
+    // disable exposure
+    parameters_init.erase("ExposureTime");
   }
-  return {};
+
+  // apply parameter overrides
+  for (const auto &[name, value] : parameters_overrides)
+    parameters_init[name] = value;
+
+  // overrides: prefer provided exposure
+  if (parameters_init.count("AeEnable") && parameters_init.at("AeEnable").get<bool>() &&
+      parameters_init.count("ExposureTime"))
+  {
+      // disable auto exposure
+      parameters_init.at("AeEnable") = rclcpp::ParameterValue(false);
+      msg = msg + "AeEnable and ExposureTime must not be enabled at the same time, set 'AeEnable' to off";
+  }
+
+  return {parameters_init, msg};
 }
 
 rcl_interfaces::msg::SetParametersResult
@@ -60,11 +77,13 @@ check_conflicts(const std::vector<rclcpp::Parameter> &parameters_new,
   // is auto exposure going to be enabled?
   const bool ae_enabled =
     parameter_map.count("AeEnable") && parameter_map.at("AeEnable").get<bool>();
+  std::cout << "ae_enabled: " << ae_enabled << std::endl;
   // are new parameters setting the exposure manually?
   const bool exposure_updated =
     std::find_if(parameters_new.begin(), parameters_new.end(), [](const rclcpp::Parameter &param) {
       return param.get_name() == "ExposureTime";
     }) != parameters_new.end();
+  std::cout << "exposure_updated: " << exposure_updated << std::endl;
 
   // ExposureTime must not be set while AeEnable is true
   if (ae_enabled && exposure_updated)
@@ -403,17 +422,13 @@ CameraNode::declareParameters()
   callback_parameter_change = add_on_set_parameters_callback(
     std::bind(&CameraNode::onParameterChange, this, std::placeholders::_1));
 
-  // resolve conflicts of default libcamera configuration
-  resolve_conflicts(parameters_init);
+  // resolve conflicts of default libcamera configuration and user provided overrides
+  std::string status;
+  std::tie(parameters_init, status) = \
+          resolve_conflicts(parameters_init, get_node_parameters_interface()->get_parameter_overrides());
 
-  // apply parameter overrides
-  for (const auto &[name, value] : get_node_parameters_interface()->get_parameter_overrides())
-    parameters_init[name] = value;
-
-  // resolve conflicts of provied configuration
-  const std::string msg = resolve_conflicts(parameters_init);
-  if (!msg.empty())
-    RCLCPP_WARN_STREAM(get_logger(), msg);
+  if (!status.empty())
+    RCLCPP_WARN_STREAM(get_logger(), status);
 
   std::vector<rclcpp::Parameter> parameters_init_list;
   for (const auto &[name, value] : parameters_init)
