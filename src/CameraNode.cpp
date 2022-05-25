@@ -104,7 +104,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     const std::shared_ptr<libcamera::Camera> camera = camera_manager.cameras().at(id);
     const libcamera::ControlList &properties = camera->properties();
     const std::string name = properties.contains(libcamera::properties::Model)
-                               ? properties.get(libcamera::properties::Model)
+                               ? properties.get(libcamera::properties::Model).value()
                                : "UNDEFINED";
     std::cout << id << ": " << name << " (" << camera->id() << ")" << std::endl;
   }
@@ -198,7 +198,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   const libcamera::ControlList &props = camera->properties();
   std::string cname = camera->id() + '_' + scfg.size.toString();
   if (props.contains(libcamera::properties::Model))
-    cname = props.get(libcamera::properties::Model) + '_' + cname;
+    cname = props.get(libcamera::properties::Model).value() + '_' + cname;
 
   // clean camera name of non-alphanumeric characters
   cname.erase(
