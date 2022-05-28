@@ -52,9 +52,10 @@ resolve_conflicts(const ParameterMap &parameters_default, const ParameterMap &pa
   if (parameters_init.count("AeEnable") && parameters_init.at("AeEnable").get<bool>() &&
       parameters_init.count("ExposureTime"))
   {
-      // disable auto exposure
-      parameters_init.at("AeEnable") = rclcpp::ParameterValue(false);
-      msg = msg + "AeEnable and ExposureTime must not be enabled at the same time, set 'AeEnable' to off";
+    // disable auto exposure
+    parameters_init.at("AeEnable") = rclcpp::ParameterValue(false);
+    msg =
+      msg + "AeEnable and ExposureTime must not be enabled at the same time, set 'AeEnable' to off";
   }
 
   return {parameters_init, msg};
@@ -424,8 +425,8 @@ CameraNode::declareParameters()
 
   // resolve conflicts of default libcamera configuration and user provided overrides
   std::string status;
-  std::tie(parameters_init, status) = \
-          resolve_conflicts(parameters_init, get_node_parameters_interface()->get_parameter_overrides());
+  std::tie(parameters_init, status) =
+    resolve_conflicts(parameters_init, get_node_parameters_interface()->get_parameter_overrides());
 
   if (!status.empty())
     RCLCPP_WARN_STREAM(get_logger(), status);
