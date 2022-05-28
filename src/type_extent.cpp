@@ -49,6 +49,16 @@ get_extent(const libcamera::ControlId *id)
   IF(FrameDuration)
   IF(FrameDurationLimits)
   IF(SensorTimestamp)
+  IF(AfMode)
+  IF(AfRange)
+  IF(AfSpeed)
+  IF(AfMetering)
+  IF(AfWindows)
+  IF(AfTrigger)
+  IF(AfPause)
+  IF(LensPosition)
+  IF(AfState)
+  IF(AfPauseState)
 
   throw std::runtime_error("control " + id->name() + " (" + std::to_string(id->id()) +
                            ") not handled");
