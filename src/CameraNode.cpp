@@ -1,8 +1,14 @@
+#include "clamp.hpp"
+#include "cv_to_pv.hpp"
+#include "pv_to_cv.hpp"
+#include "type_extent.hpp"
+#include "types.hpp"
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <cstring>
 #include <cv_bridge/cv_bridge.h>
 #include <libcamera/camera.h>
 #include <libcamera/camera_manager.h>
+#include <libcamera/control_ids.h>
 #include <libcamera/formats.h>
 #include <libcamera/framebuffer_allocator.h>
 #include <libcamera/property_ids.h>
@@ -13,6 +19,75 @@
 #include <sensor_msgs/msg/image.hpp>
 #include <sys/mman.h>
 
+
+typedef std::map<std::string, rclcpp::ParameterValue> ParameterMap;
+
+
+std::tuple<ParameterMap, std::vector<std::string>>
+resolve_conflicts(const ParameterMap &parameters_default, const ParameterMap &parameters_overrides)
+{
+  ParameterMap parameters_init = parameters_default;
+  std::vector<std::string> msgs;
+
+  // auto exposure (AeEnable) and manual exposure (ExposureTime)
+  // must not be enabled at the same time
+
+  // default: prefer auto exposure
+  if (parameters_init.count("AeEnable") && parameters_init.at("AeEnable").get<bool>() &&
+      parameters_init.count("ExposureTime"))
+  {
+    // disable exposure
+    parameters_init.erase("ExposureTime");
+  }
+
+  // apply parameter overrides
+  for (const auto &[name, value] : parameters_overrides)
+    parameters_init[name] = value;
+
+  // overrides: prefer provided exposure
+  if (parameters_init.count("AeEnable") && parameters_init.at("AeEnable").get<bool>() &&
+      parameters_init.count("ExposureTime"))
+  {
+    // disable auto exposure
+    parameters_init.at("AeEnable") = rclcpp::ParameterValue(false);
+    msgs.push_back("AeEnable and ExposureTime must not be enabled at the same time. 'AeEnable' "
+                   "will be set to off.");
+  }
+
+  return {parameters_init, msgs};
+}
+
+rcl_interfaces::msg::SetParametersResult
+check_conflicts(const std::vector<rclcpp::Parameter> &parameters_new,
+                const ParameterMap &parameters_full)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+
+  ParameterMap parameter_map;
+  // old configuration state
+  for (const auto &[name, value] : parameters_full)
+    parameter_map[name] = value;
+  // apply new configuration update
+  for (const auto &p : parameters_new)
+    parameter_map[p.get_name()] = p.get_parameter_value();
+
+  // is auto exposure going to be enabled?
+  const bool ae_enabled =
+    parameter_map.count("AeEnable") && parameter_map.at("AeEnable").get<bool>();
+  // are new parameters setting the exposure manually?
+  const bool exposure_updated =
+    std::find_if(parameters_new.begin(), parameters_new.end(), [](const rclcpp::Parameter &param) {
+      return param.get_name() == "ExposureTime";
+    }) != parameters_new.end();
+
+  // ExposureTime must not be set while AeEnable is true
+  if (ae_enabled && exposure_updated)
+    result.reason = "AeEnable and ExposureTime must not be set simultaneously";
+
+  result.successful = result.reason.empty();
+
+  return result;
+}
 
 namespace camera
 {
@@ -38,8 +113,24 @@ private:
 
   camera_info_manager::CameraInfoManager cim;
 
+  OnSetParametersCallbackHandle::SharedPtr callback_parameter_change;
+
+  // map parameter names to libcamera control id
+  std::unordered_map<std::string, const libcamera::ControlId *> parameter_ids;
+  // parameters that are to be set for every request
+  std::unordered_map<unsigned int, libcamera::ControlValue> parameters;
+  // keep track of set parameters
+  ParameterMap parameters_full;
+  std::mutex parameters_lock;
+
+  void
+  declareParameters();
+
   void
   requestComplete(libcamera::Request *request);
+
+  rcl_interfaces::msg::SetParametersResult
+  onParameterChange(const std::vector<rclcpp::Parameter> &parameters);
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(camera::CameraNode)
@@ -219,6 +310,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   if (!cim.setCameraName(cname))
     throw std::runtime_error("camera name must only contain alphanumeric characters");
 
+  declareParameters();
+
   // allocate stream buffers and create one request per buffer
   libcamera::Stream *stream = scfg.stream();
 
@@ -254,6 +347,99 @@ CameraNode::~CameraNode()
     std::cerr << "failed to stop camera" << std::endl;
   camera->release();
   camera_manager.stop();
+}
+
+void
+CameraNode::declareParameters()
+{
+  // dynamic camera configuration
+  ParameterMap parameters_init;
+  for (const auto &[id, info] : camera->controls()) {
+    // store control id with name
+    parameter_ids[id->name()] = id;
+
+    std::size_t extent;
+    try {
+      extent = get_extent(id);
+    }
+    catch (const std::runtime_error &e) {
+      // ignore
+      RCLCPP_WARN_STREAM(get_logger(), e.what());
+      continue;
+    }
+
+    // format type description
+    const std::string cv_descr =
+      std::to_string(id->type()) + " " +
+      std::string(extent > 1 ? "array[" + std::to_string(extent) + "]" : "scalar") + " range {" +
+      info.min().toString() + "}..{" + info.max().toString() + "}" +
+      (info.def().isNone() ? std::string {} : " (default: {" + info.def().toString() + "})");
+
+    if (info.min().numElements() != info.max().numElements())
+      throw std::runtime_error("minimum and maximum parameter array sizes do not match");
+
+    // clamp default ControlValue to min/max range and cast ParameterValue
+    const rclcpp::ParameterValue value =
+      cv_to_pv(clamp(info.def(), info.min(), info.max()), extent);
+
+    // get smallest bounds for minimum and maximum set
+    rcl_interfaces::msg::IntegerRange range_int;
+    rcl_interfaces::msg::FloatingPointRange range_float;
+
+    switch (id->type()) {
+    case libcamera::ControlTypeInteger32:
+      range_int.from_value = max<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(info.min());
+      range_int.to_value = min<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(info.max());
+      break;
+    case libcamera::ControlTypeInteger64:
+      range_int.from_value = max<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(info.min());
+      range_int.to_value = min<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(info.max());
+      break;
+    case libcamera::ControlTypeFloat:
+      range_float.from_value = max<ControlTypeMap<libcamera::ControlTypeFloat>::type>(info.min());
+      range_float.to_value = min<ControlTypeMap<libcamera::ControlTypeFloat>::type>(info.max());
+      break;
+    default:
+      break;
+    }
+
+    rcl_interfaces::msg::ParameterDescriptor param_descr;
+    param_descr.description = cv_descr;
+    if (range_int.from_value != range_int.to_value)
+      param_descr.integer_range = {range_int};
+    if (range_float.from_value != range_float.to_value)
+      param_descr.floating_point_range = {range_float};
+
+    // declare parameters and set default or initial value
+    RCLCPP_DEBUG_STREAM(get_logger(),
+                        "declare " << id->name() << " with default " << rclcpp::to_string(value));
+    if (value.get_type() == rclcpp::ParameterType::PARAMETER_NOT_SET) {
+      declare_parameter(id->name(), cv_to_pv_type(id->type(), extent > 0), param_descr);
+    }
+    else {
+      declare_parameter(id->name(), value, param_descr);
+      parameters_init[id->name()] = value;
+    }
+  }
+
+  // register callback to handle parameter changes
+  // We have to register the callback after parameter declaration
+  // to avoid callbacks interfering with the default parameter check.
+  callback_parameter_change = add_on_set_parameters_callback(
+    std::bind(&CameraNode::onParameterChange, this, std::placeholders::_1));
+
+  // resolve conflicts of default libcamera configuration and user provided overrides
+  std::vector<std::string> status;
+  std::tie(parameters_init, status) =
+    resolve_conflicts(parameters_init, get_node_parameters_interface()->get_parameter_overrides());
+
+  for (const std::string &s : status)
+    RCLCPP_WARN_STREAM(get_logger(), s);
+
+  std::vector<rclcpp::Parameter> parameters_init_list;
+  for (const auto &[name, value] : parameters_init)
+    parameters_init_list.emplace_back(name, value);
+  set_parameters(parameters_init_list);
 }
 
 void
@@ -350,7 +536,77 @@ CameraNode::requestComplete(libcamera::Request *request)
 
   // queue the request again for the next frame
   request->reuse(libcamera::Request::ReuseBuffers);
+
+  // update parameters
+  parameters_lock.lock();
+  for (const auto &[id, value] : parameters)
+    request->controls().set(id, value);
+  parameters.clear();
+  parameters_lock.unlock();
+
   camera->queueRequest(request);
+}
+
+rcl_interfaces::msg::SetParametersResult
+CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+
+  // check target parameter state (current and new parameters)
+  // for conflicting configuration
+  result = check_conflicts(parameters, parameters_full);
+  if (!result.successful)
+    return result;
+
+  result.successful = true;
+
+  for (const rclcpp::Parameter &parameter : parameters) {
+    RCLCPP_DEBUG_STREAM(get_logger(), "setting " << parameter.get_type_name() << " parameter "
+                                                 << parameter.get_name() << " to "
+                                                 << parameter.value_to_string());
+
+    if (parameter_ids.count(parameter.get_name())) {
+      const libcamera::ControlId *id = parameter_ids.at(parameter.get_name());
+      libcamera::ControlValue value = pv_to_cv(parameter, id->type());
+
+      if (!value.isNone()) {
+        // verify parameter type and dimension against default
+        const libcamera::ControlInfo &ci = camera->controls().at(id);
+
+        if (value.type() != id->type()) {
+          result.successful = false;
+          result.reason = parameter.get_name() + ": parameter types mismatch, expected '" +
+                          std::to_string(id->type()) + "', got '" + std::to_string(value.type()) +
+                          "'";
+          return result;
+        }
+
+        const std::size_t extent = get_extent(id);
+        if ((value.isArray() && (extent > 0)) && value.numElements() != extent) {
+          result.successful = false;
+          result.reason = parameter.get_name() + ": parameter dimensions mismatch, expected " +
+                          std::to_string(extent) + ", got " + std::to_string(value.numElements());
+          return result;
+        }
+
+        // check bounds and return error
+        if (value < ci.min() || value > ci.max()) {
+          result.successful = false;
+          result.reason =
+            "parameter value " + value.toString() + " outside of range: " + ci.toString();
+          return result;
+        }
+
+        parameters_lock.lock();
+        this->parameters[parameter_ids.at(parameter.get_name())->id()] = value;
+        parameters_lock.unlock();
+
+        parameters_full[parameter.get_name()] = parameter.get_parameter_value();
+      }
+    }
+  }
+
+  return result;
 }
 
 } // namespace camera

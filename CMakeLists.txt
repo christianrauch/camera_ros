@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
+  add_link_options("-Wl,-z,relro,-z,now,-z,defs")
 endif()
 
 find_package(PkgConfig REQUIRED)
@@ -18,6 +19,22 @@ find_package(camera_info_manager REQUIRED)
 find_package(cv_bridge REQUIRED)
 pkg_check_modules(libcamera REQUIRED libcamera)
 
+# library with common utility functions for type conversions
+add_library(utils OBJECT
+  src/clamp.cpp
+  src/cv_to_pv.cpp
+  src/pv_to_cv.cpp
+  src/types.cpp
+  src/type_extent.cpp
+)
+target_include_directories(utils PUBLIC ${libcamera_INCLUDE_DIRS})
+ament_target_dependencies(
+  utils
+  "rclcpp"
+)
+set_property(TARGET utils PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+# composable ROS2 node
 add_library(camera_component SHARED src/CameraNode.cpp)
 rclcpp_components_register_node(camera_component PLUGIN "camera::CameraNode" EXECUTABLE "camera_node")
 
@@ -34,7 +51,7 @@ ament_target_dependencies(
 )
 
 target_include_directories(camera_component PUBLIC ${libcamera_INCLUDE_DIRS})
-target_link_libraries(camera_component ${libcamera_LINK_LIBRARIES})
+target_link_libraries(camera_component ${libcamera_LINK_LIBRARIES} utils)
 
 install(TARGETS camera_component
   DESTINATION lib)
