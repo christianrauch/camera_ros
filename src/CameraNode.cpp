@@ -1,4 +1,5 @@
 #include "clamp.hpp"
+#include "compression.hpp"
 #include "cv_to_pv.hpp"
 #include "format_mapping.hpp"
 #include "parameter_conflict_check.hpp"
@@ -14,7 +15,6 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
-#include <cv_bridge/cv_bridge.h>
 #include <functional>
 #include <iostream>
 #include <libcamera/base/shared_fd.h>
@@ -522,8 +522,7 @@ CameraNode::requestComplete(libcamera::Request *request)
       memcpy(msg_img->data.data(), buffer_info[buffer].data, buffer_info[buffer].size);
 
       // compress to jpeg
-      if (pub_image_compressed->get_subscription_count())
-        cv_bridge::toCvCopy(*msg_img)->toCompressedImageMsg(*msg_img_compressed);
+      //      cv_bridge::toCvCopy(*msg_img)->toCompressedImageMsg(*msg_img_compressed);
     }
     else if (format_type(cfg.pixelFormat) == FormatType::COMPRESSED) {
       // compressed image
@@ -534,8 +533,8 @@ CameraNode::requestComplete(libcamera::Request *request)
       memcpy(msg_img_compressed->data.data(), buffer_info[buffer].data, bytesused);
 
       // decompress into raw rgb8 image
-      if (pub_image->get_subscription_count())
-        cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
+      //      cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
+      msg_img = decompress(msg_img_compressed);
     }
     else {
       throw std::runtime_error("unsupported pixel format: " +

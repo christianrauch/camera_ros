@@ -16,12 +16,13 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(camera_info_manager REQUIRED)
-find_package(cv_bridge REQUIRED)
+find_package(JPEG REQUIRED)
 pkg_check_modules(libcamera REQUIRED libcamera)
 
 # library with common utility functions for type conversions
 add_library(utils OBJECT
   src/clamp.cpp
+  src/compression.cpp
   src/cv_to_pv.cpp
   src/format_mapping.cpp
   src/parameter_conflict_check.cpp
@@ -31,6 +32,7 @@ add_library(utils OBJECT
   src/type_extent.cpp
 )
 target_include_directories(utils PUBLIC ${libcamera_INCLUDE_DIRS})
+target_link_libraries(utils JPEG::JPEG)
 ament_target_dependencies(
   utils
   "rclcpp"
@@ -51,7 +53,6 @@ ament_target_dependencies(
   "rclcpp_components"
   "sensor_msgs"
   "camera_info_manager"
-  "cv_bridge"
 )
 
 target_include_directories(camera_component PUBLIC ${libcamera_INCLUDE_DIRS})

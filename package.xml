@@ -13,7 +13,7 @@
   <depend>rclcpp_components</depend>
   <depend>sensor_msgs</depend>
   <depend>camera_info_manager</depend>
-  <depend>cv_bridge</depend>
+  <depend>libjpeg</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_cmake_clang_format</test_depend>
