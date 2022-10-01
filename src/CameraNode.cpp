@@ -103,6 +103,7 @@ private:
   std::shared_ptr<libcamera::Camera> camera;
   std::shared_ptr<libcamera::FrameBufferAllocator> allocator;
   std::vector<std::unique_ptr<libcamera::Request>> requests;
+  std::mutex request_lock;
 
   // timestamp offset (ns) from camera time to system time
   int64_t time_offset = 0;
@@ -343,8 +344,10 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 CameraNode::~CameraNode()
 {
   camera->requestCompleted.disconnect();
+  request_lock.lock();
   if (camera->stop())
     std::cerr << "failed to stop camera" << std::endl;
+  request_lock.unlock();
   camera->release();
   camera_manager.stop();
 }
@@ -445,6 +448,8 @@ CameraNode::declareParameters()
 void
 CameraNode::requestComplete(libcamera::Request *request)
 {
+  request_lock.lock();
+
   if (request->status() == libcamera::Request::RequestComplete) {
     assert(request->buffers().size() == 1);
 
@@ -545,6 +550,8 @@ CameraNode::requestComplete(libcamera::Request *request)
   parameters_lock.unlock();
 
   camera->queueRequest(request);
+
+  request_lock.unlock();
 }
 
 rcl_interfaces::msg::SetParametersResult
