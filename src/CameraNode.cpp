@@ -132,6 +132,9 @@ private:
 
   rcl_interfaces::msg::SetParametersResult
   onParameterChange(const std::vector<rclcpp::Parameter> &parameters);
+
+  void
+  list_cameras();
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(camera::CameraNode)
@@ -191,7 +194,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   declare_parameter<int64_t>("height", {}, param_descr_ro);
 
   // camera ID
-  declare_parameter<int64_t>("camera", 0, param_descr_ro);
+  declare_parameter("camera", rclcpp::ParameterValue {}, param_descr_ro.set__dynamic_typing(true));
 
   // publisher for raw and compressed image
   pub_image = this->create_publisher<sensor_msgs::msg::Image>("~/image_raw", 1);
@@ -204,18 +207,41 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   if (camera_manager.cameras().empty())
     throw std::runtime_error("no cameras available");
 
-  std::cout << ">> cameras:" << std::endl;
-  for (size_t id = 0; id < camera_manager.cameras().size(); id++) {
-    const std::shared_ptr<libcamera::Camera> camera = camera_manager.cameras().at(id);
-    const libcamera::ControlList &properties = camera->properties();
-    const std::string name = properties.get(libcamera::properties::Model).value_or("UNDEFINED");
-    std::cout << id << ": " << name << " (" << camera->id() << ")" << std::endl;
+  // get the camera
+  switch (get_parameter("camera").get_type()) {
+  case rclcpp::ParameterType::PARAMETER_NOT_SET:
+    // use first camera as default
+    camera = camera_manager.cameras().front();
+    list_cameras();
+    RCLCPP_WARN_STREAM(get_logger(),
+                       "no camera selected, using default: \"" << camera->id() << "\"");
+    break;
+  case rclcpp::ParameterType::PARAMETER_INTEGER:
+  {
+    const size_t id = get_parameter("camera").as_int();
+    if (id >= camera_manager.cameras().size()) {
+      list_cameras();
+      throw std::runtime_error("camera with id " + std::to_string(id) + " does not exist");
+    }
+    camera = camera_manager.cameras().at(id);
+    RCLCPP_DEBUG_STREAM(get_logger(), "found camera by id: " << id);
+  } break;
+  case rclcpp::ParameterType::PARAMETER_STRING:
+  {
+    const std::string name = get_parameter("camera").as_string();
+    camera = camera_manager.get(name);
+    if (!camera) {
+      list_cameras();
+      throw std::runtime_error("camera with name " + name + " does not exist");
+    }
+    RCLCPP_DEBUG_STREAM(get_logger(), "found camera by name: \"" << name << "\"");
+  } break;
+  default:
+    RCLCPP_ERROR_STREAM(get_logger(), "unuspported camera parameter type: "
+                                        << get_parameter("camera").get_type_name());
+    break;
   }
 
-  // get the camera
-  if (size_t(get_parameter("camera").as_int()) >= camera_manager.cameras().size())
-    throw std::runtime_error("camera does not exist");
-  camera = camera_manager.cameras().at(get_parameter("camera").as_int());
   if (!camera)
     throw std::runtime_error("failed to find camera");
 
@@ -614,6 +640,20 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
   }
 
   return result;
+}
+
+void
+CameraNode::list_cameras()
+{
+  std::stringstream ss;
+  ss << std::endl << ">> cameras:";
+  for (size_t id = 0; id < camera_manager.cameras().size(); id++) {
+    const std::shared_ptr<libcamera::Camera> camera = camera_manager.cameras().at(id);
+    const std::string name =
+      camera->properties().get(libcamera::properties::Model).value_or("UNDEFINED");
+    ss << std::endl << "   " << id << ": " << name << " (" << camera->id() << ")";
+  }
+  RCLCPP_INFO_STREAM(get_logger(), ss.str());
 }
 
 } // namespace camera
