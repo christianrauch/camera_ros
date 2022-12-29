@@ -532,6 +532,7 @@ CameraNode::requestComplete(libcamera::Request *request)
       msg_img->height = cfg.size.height;
       msg_img->step = cfg.stride;
       msg_img->encoding = map_format_raw.at(cfg.pixelFormat.fourcc());
+      msg_img->is_bigendian = (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__);
       msg_img->data.resize(buffers[0].size);
       memcpy(msg_img->data.data(), buffers[0].data, buffers[0].size);
 
