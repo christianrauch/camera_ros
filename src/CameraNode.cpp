@@ -192,6 +192,24 @@ node_check_pixel_format_support(const libcamera::PixelFormat &pixelformat)
          map_format_compressed.count(pixelformat.fourcc());
 }
 
+libcamera::StreamRole
+get_role(const std::string &role)
+{
+  static const std::unordered_map<std::string, libcamera::StreamRole> roles_map = {
+    {"raw", libcamera::StreamRole::Raw},
+    {"still", libcamera::StreamRole::StillCapture},
+    {"video", libcamera::StreamRole::VideoRecording},
+    {"viewfinder", libcamera::StreamRole::Viewfinder},
+  };
+
+  try {
+    return roles_map.at(role);
+  }
+  catch (const std::out_of_range &) {
+    throw std::runtime_error("invalid stream role: \"" + role + "\"");
+  }
+}
+
 CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options), cim(this)
 {
   // pixel format
@@ -199,6 +217,13 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   param_descr_format.description = "pixel format of streaming buffer";
   param_descr_format.read_only = true;
   declare_parameter<std::string>("format", {}, param_descr_format);
+
+  // stream role
+  rcl_interfaces::msg::ParameterDescriptor param_descr_role;
+  param_descr_role.description = "stream role";
+  param_descr_role.additional_constraints = "one of {raw, still, video, viewfinder}";
+  param_descr_role.read_only = true;
+  declare_parameter<std::string>("role", "video", param_descr_role);
 
   // image dimensions
   rcl_interfaces::msg::ParameterDescriptor param_descr_ro;
@@ -263,7 +288,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
   // configure camera stream
   std::unique_ptr<libcamera::CameraConfiguration> cfg =
-    camera->generateConfiguration({libcamera::StreamRole::VideoRecording});
+    camera->generateConfiguration({get_role(get_parameter("role").as_string())});
 
   if (!cfg)
     throw std::runtime_error("failed to generate configuration");
