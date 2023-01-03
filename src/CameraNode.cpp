@@ -185,6 +185,13 @@ const std::unordered_map<uint32_t, std::string> map_format_compressed = {
   {libcamera::formats::MJPEG.fourcc(), "jpeg"},
 };
 
+bool
+node_check_pixel_format_support(const libcamera::PixelFormat &pixelformat)
+{
+  return map_format_raw.count(pixelformat.fourcc()) ||
+         map_format_compressed.count(pixelformat.fourcc());
+}
+
 CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options), cim(this)
 {
   // pixel format
@@ -263,33 +270,43 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
   libcamera::StreamConfiguration &scfg = cfg->at(0);
   // store full list of stream formats
-  const libcamera::StreamFormats stream_formats = scfg.formats();
+  const libcamera::StreamFormats &stream_formats = scfg.formats();
+  const std::vector<libcamera::PixelFormat> &pixel_formats = scfg.formats().pixelformats();
   const std::string format = get_parameter("format").as_string();
   if (format.empty()) {
     list_stream_formats(stream_formats);
-    // find first supported pixel format available by camera
-    scfg.pixelFormat = {};
-    for (const libcamera::PixelFormat &pixelformat : scfg.formats().pixelformats()) {
-      if (map_format_raw.count(pixelformat.fourcc()) ||
-          map_format_compressed.count(pixelformat.fourcc())) {
-        scfg.pixelFormat = pixelformat;
-        break;
-      }
-    }
+    // check if the default pixel format is supported
+    if (!node_check_pixel_format_support(scfg.pixelFormat)) {
+      // find first supported pixel format available by camera
+      const auto result =
+        std::find_if(pixel_formats.begin(), pixel_formats.end(), node_check_pixel_format_support);
 
-    if (!scfg.pixelFormat.isValid())
-      throw std::runtime_error("camera does not provide any of the supported pixel formats");
+      if (result == pixel_formats.end())
+        throw std::runtime_error("camera does not provide any of the supported pixel formats");
+
+      scfg.pixelFormat = *result;
+    }
 
     RCLCPP_WARN_STREAM(get_logger(),
                        "no pixel format selected, using default: \"" << scfg.pixelFormat << "\"");
   }
   else {
     // get pixel format from provided string
-    scfg.pixelFormat = libcamera::PixelFormat::fromString(format);
-    if (!scfg.pixelFormat.isValid()) {
+    const libcamera::PixelFormat format_requested = libcamera::PixelFormat::fromString(format);
+    if (!format_requested.isValid()) {
       list_stream_formats(stream_formats);
       throw std::runtime_error("invalid pixel format: \"" + format + "\"");
     }
+    // check that requested format is supported by camera
+    if (std::find(pixel_formats.begin(), pixel_formats.end(), format_requested) ==
+        pixel_formats.end()) {
+      list_stream_formats(stream_formats);
+      throw std::runtime_error("pixel format \"" + format + "\" is unsupported by camera");
+    }
+    // check that requested format is supported by node
+    if (!node_check_pixel_format_support(format_requested))
+      throw std::runtime_error("pixel format \"" + format + "\" is unsupported by node");
+    scfg.pixelFormat = format_requested;
   }
 
   const libcamera::Size size(get_parameter("width").as_int(), get_parameter("height").as_int());
