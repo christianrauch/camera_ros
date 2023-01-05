@@ -23,6 +23,7 @@ pkg_check_modules(libcamera REQUIRED libcamera)
 add_library(utils OBJECT
   src/clamp.cpp
   src/cv_to_pv.cpp
+  src/format_mapping.cpp
   src/parameter_conflict_check.cpp
   src/pv_to_cv.cpp
   src/types.cpp
@@ -32,6 +33,7 @@ target_include_directories(utils PUBLIC ${libcamera_INCLUDE_DIRS})
 ament_target_dependencies(
   utils
   "rclcpp"
+  "sensor_msgs"
 )
 set_property(TARGET utils PROPERTY POSITION_INDEPENDENT_CODE ON)
 

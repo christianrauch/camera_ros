@@ -1,21 +1,19 @@
 #include "clamp.hpp"
 #include "cv_to_pv.hpp"
+#include "format_mapping.hpp"
 #include "parameter_conflict_check.hpp"
 #include "pv_to_cv.hpp"
 #include "type_extent.hpp"
 #include "types.hpp"
 #include <camera_info_manager/camera_info_manager.hpp>
-#include <cstring>
 #include <cv_bridge/cv_bridge.h>
 #include <libcamera/camera.h>
 #include <libcamera/camera_manager.h>
 #include <libcamera/control_ids.h>
-#include <libcamera/formats.h>
 #include <libcamera/framebuffer_allocator.h>
 #include <libcamera/property_ids.h>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
-#include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sys/mman.h>
@@ -84,45 +82,6 @@ struct buffer_t
   size_t size;
 };
 
-//mapping of FourCC to ROS image encodings
-// see 'include/uapi/drm/drm_fourcc.h' for a full FourCC list
-
-// supported FourCC formats, without conversion
-const std::unordered_map<uint32_t, std::string> map_format_raw = {
-  // RGB encodings
-  // NOTE: Following the DRM definition, RGB formats codes are stored in little-endian order.
-  {libcamera::formats::R8.fourcc(), sensor_msgs::image_encodings::MONO8},
-  {libcamera::formats::RGB888.fourcc(), sensor_msgs::image_encodings::BGR8},
-  {libcamera::formats::BGR888.fourcc(), sensor_msgs::image_encodings::RGB8},
-  {libcamera::formats::XRGB8888.fourcc(), sensor_msgs::image_encodings::BGRA8},
-  {libcamera::formats::XBGR8888.fourcc(), sensor_msgs::image_encodings::RGBA8},
-  {libcamera::formats::ARGB8888.fourcc(), sensor_msgs::image_encodings::BGRA8},
-  {libcamera::formats::ABGR8888.fourcc(), sensor_msgs::image_encodings::RGBA8},
-  // YUV encodings
-  {libcamera::formats::YUYV.fourcc(), sensor_msgs::image_encodings::YUV422_YUY2},
-  {libcamera::formats::UYVY.fourcc(), sensor_msgs::image_encodings::YUV422},
-  // Bayer encodings
-  {libcamera::formats::SRGGB8.fourcc(), sensor_msgs::image_encodings::BAYER_RGGB8},
-  {libcamera::formats::SGRBG8.fourcc(), sensor_msgs::image_encodings::BAYER_GRBG8},
-  {libcamera::formats::SGBRG8.fourcc(), sensor_msgs::image_encodings::BAYER_GBRG8},
-  {libcamera::formats::SBGGR8.fourcc(), sensor_msgs::image_encodings::BAYER_BGGR8},
-  {libcamera::formats::SRGGB16.fourcc(), sensor_msgs::image_encodings::BAYER_RGGB16},
-  {libcamera::formats::SGRBG16.fourcc(), sensor_msgs::image_encodings::BAYER_GRBG16},
-  {libcamera::formats::SGBRG16.fourcc(), sensor_msgs::image_encodings::BAYER_GBRG16},
-  {libcamera::formats::SBGGR16.fourcc(), sensor_msgs::image_encodings::BAYER_BGGR16},
-};
-
-// supported FourCC formats, without conversion, compressed
-const std::unordered_map<uint32_t, std::string> map_format_compressed = {
-  {libcamera::formats::MJPEG.fourcc(), "jpeg"},
-};
-
-bool
-node_check_pixel_format_support(const libcamera::PixelFormat &pixelformat)
-{
-  return map_format_raw.count(pixelformat.fourcc()) ||
-         map_format_compressed.count(pixelformat.fourcc());
-}
 
 libcamera::StreamRole
 get_role(const std::string &role)
@@ -233,10 +192,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   if (format.empty()) {
     list_stream_formats(stream_formats);
     // check if the default pixel format is supported
-    if (!node_check_pixel_format_support(scfg.pixelFormat)) {
+    if (format_type(scfg.pixelFormat) == FormatType::NONE) {
       // find first supported pixel format available by camera
-      const auto result =
-        std::find_if(pixel_formats.begin(), pixel_formats.end(), node_check_pixel_format_support);
+      const auto result = std::find_if(
+        pixel_formats.begin(), pixel_formats.end(),
+        [](const libcamera::PixelFormat &fmt) { return format_type(fmt) != FormatType::NONE; });
 
       if (result == pixel_formats.end())
         throw std::runtime_error("camera does not provide any of the supported pixel formats");
@@ -261,7 +221,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
       throw std::runtime_error("pixel format \"" + format + "\" is unsupported by camera");
     }
     // check that requested format is supported by node
-    if (!node_check_pixel_format_support(format_requested))
+    if (format_type(format_requested) == FormatType::NONE)
       throw std::runtime_error("pixel format \"" + format + "\" is unsupported by node");
     scfg.pixelFormat = format_requested;
   }
@@ -496,7 +456,7 @@ CameraNode::requestComplete(libcamera::Request *request)
     hdr.frame_id = "camera";
     const libcamera::StreamConfiguration &cfg = stream->configuration();
 
-    if (map_format_raw.count(cfg.pixelFormat.fourcc())) {
+    if (format_type(cfg.pixelFormat) == FormatType::RAW) {
       // raw uncompressed image
       assert(buffers.size() == 1);
       sensor_msgs::msg::Image::UniquePtr msg_img;
@@ -505,7 +465,7 @@ CameraNode::requestComplete(libcamera::Request *request)
       msg_img->width = cfg.size.width;
       msg_img->height = cfg.size.height;
       msg_img->step = cfg.stride;
-      msg_img->encoding = map_format_raw.at(cfg.pixelFormat.fourcc());
+      msg_img->encoding = get_ros_encoding(cfg.pixelFormat);
       msg_img->is_bigendian = (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__);
       msg_img->data.resize(buffers[0].size);
       memcpy(msg_img->data.data(), buffers[0].data, buffers[0].size);
@@ -518,13 +478,13 @@ CameraNode::requestComplete(libcamera::Request *request)
       pub_image->publish(std::move(msg_img));
       pub_image_compressed->publish(std::move(msg_img_compressed));
     }
-    else if (map_format_compressed.count(cfg.pixelFormat.fourcc())) {
+    else if (format_type(cfg.pixelFormat) == FormatType::COMPRESSED) {
       // compressed image
       assert(buffers.size() == 1);
       sensor_msgs::msg::CompressedImage::UniquePtr msg_img_compressed;
       msg_img_compressed = std::make_unique<sensor_msgs::msg::CompressedImage>();
       msg_img_compressed->header = hdr;
-      msg_img_compressed->format = map_format_compressed.at(cfg.pixelFormat.fourcc());
+      msg_img_compressed->format = get_ros_encoding(cfg.pixelFormat);
       msg_img_compressed->data.resize(buffers[0].size);
       memcpy(msg_img_compressed->data.data(), buffers[0].data, buffers[0].size);
 
