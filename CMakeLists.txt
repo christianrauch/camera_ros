@@ -23,6 +23,7 @@ pkg_check_modules(libcamera REQUIRED libcamera)
 add_library(utils OBJECT
   src/clamp.cpp
   src/cv_to_pv.cpp
+  src/parameter_conflict_check.cpp
   src/pv_to_cv.cpp
   src/types.cpp
   src/type_extent.cpp
