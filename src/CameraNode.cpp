@@ -404,16 +404,16 @@ CameraNode::declareParameters()
 
     switch (id->type()) {
     case libcamera::ControlTypeInteger32:
-      range_int.from_value = max<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(info.min());
-      range_int.to_value = min<ControlTypeMap<libcamera::ControlTypeInteger32>::type>(info.max());
+      range_int.from_value = max<libcamera::ControlTypeInteger32>(info.min());
+      range_int.to_value = min<libcamera::ControlTypeInteger32>(info.max());
       break;
     case libcamera::ControlTypeInteger64:
-      range_int.from_value = max<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(info.min());
-      range_int.to_value = min<ControlTypeMap<libcamera::ControlTypeInteger64>::type>(info.max());
+      range_int.from_value = max<libcamera::ControlTypeInteger64>(info.min());
+      range_int.to_value = min<libcamera::ControlTypeInteger64>(info.max());
       break;
     case libcamera::ControlTypeFloat:
-      range_float.from_value = max<ControlTypeMap<libcamera::ControlTypeFloat>::type>(info.min());
-      range_float.to_value = min<ControlTypeMap<libcamera::ControlTypeFloat>::type>(info.max());
+      range_float.from_value = max<libcamera::ControlTypeFloat>(info.min());
+      range_float.to_value = min<libcamera::ControlTypeFloat>(info.max());
       break;
     default:
       break;
