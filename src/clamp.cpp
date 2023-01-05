@@ -10,6 +10,54 @@
   case libcamera::ControlType##T:                                                                  \
     return {};
 
+#define MIN(T)                                                                                     \
+  template ControlTypeMap<libcamera::ControlType##T>::type min<libcamera::ControlType##T>(         \
+    const libcamera::ControlValue &);
+
+#define MAX(T)                                                                                     \
+  template ControlTypeMap<libcamera::ControlType##T>::type max<libcamera::ControlType##T>(         \
+    const libcamera::ControlValue &);
+
+template<enum libcamera::ControlType T>
+typename ControlTypeMap<T>::type
+min(const libcamera::ControlValue &value)
+{
+  using A = typename ControlTypeMap<T>::type;
+  using S = libcamera::Span<const A>;
+
+  if (value.isArray()) {
+    const S v = value.get<S>();
+    return *std::min_element(v.begin(), v.end());
+  }
+  else {
+    return value.get<A>();
+  }
+}
+
+template<enum libcamera::ControlType T>
+typename ControlTypeMap<T>::type
+max(const libcamera::ControlValue &value)
+{
+  using A = typename ControlTypeMap<T>::type;
+  using S = libcamera::Span<const A>;
+
+  if (value.isArray()) {
+    const S v = value.get<S>();
+    return *std::max_element(v.begin(), v.end());
+  }
+  else {
+    return value.get<A>();
+  }
+}
+
+// predefine min/max templates for arithmetic types
+MIN(Integer32)
+MIN(Integer64)
+MIN(Float)
+MAX(Integer32)
+MAX(Integer64)
+MAX(Float)
+
 namespace std
 {
 CTRectangle
