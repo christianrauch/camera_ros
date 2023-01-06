@@ -1,6 +1,10 @@
 #pragma once
-#include <libcamera/control_ids.h>
+#include <cstddef>
 
+namespace libcamera
+{
+class ControlId;
+}
 
 std::size_t
 get_extent(const libcamera::ControlId *id);

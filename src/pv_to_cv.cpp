@@ -1,5 +1,12 @@
 #include "pv_to_cv.hpp"
 #include "types.hpp"
+#include <cstdint>
+#include <libcamera/base/span.h>
+#include <libcamera/controls.h>
+#include <libcamera/geometry.h>
+#include <rclcpp/parameter.hpp>
+#include <rclcpp/parameter_value.hpp>
+#include <vector>
 
 
 libcamera::ControlValue

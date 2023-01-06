@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <libcamera/controls.h>
 #include <rclcpp/parameter_value.hpp>
 

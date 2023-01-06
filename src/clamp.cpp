@@ -1,5 +1,14 @@
 #include "types.hpp"
+#include <algorithm>
+#include <cassert>
+#include <cstddef>
+#include <libcamera/base/span.h>
 #include <libcamera/controls.h>
+#include <libcamera/geometry.h>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <vector>
 
 
 #define CASE_CLAMP(T)                                                                              \

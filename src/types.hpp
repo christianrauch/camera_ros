@@ -1,5 +1,8 @@
 #pragma once
+#include <cstdint>
 #include <libcamera/controls.h>
+#include <libcamera/geometry.h>
+#include <string>
 
 
 namespace std

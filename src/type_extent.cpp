@@ -1,4 +1,10 @@
 #include "type_extent.hpp"
+#include <libcamera/base/span.h>
+#include <libcamera/control_ids.h>
+#include <libcamera/controls.h>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
 
 
 template<typename T, std::enable_if_t<!libcamera::details::is_span<T>::value, bool> = true>

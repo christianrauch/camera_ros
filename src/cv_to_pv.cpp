@@ -1,6 +1,14 @@
 #include "cv_to_pv.hpp"
 #include "types.hpp"
+#include <cstdint>
+#include <libcamera/base/span.h>
+#include <libcamera/controls.h>
+#include <libcamera/geometry.h>
 #include <rclcpp/parameter_value.hpp>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <vector>
 
 
 #define CASE_CONVERT(T)                                                                            \

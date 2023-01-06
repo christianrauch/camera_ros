@@ -1,4 +1,5 @@
 #include "types.hpp"
+#include <libcamera/controls.h>
 
 
 #define CASE_TYPE(T)                                                                               \
