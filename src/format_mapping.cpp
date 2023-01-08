@@ -26,6 +26,8 @@ static const std::unordered_map<uint32_t, std::string> map_format_raw = {
   // YUV encodings
   {cam::YUYV.fourcc(), ros::YUV422_YUY2},
   {cam::UYVY.fourcc(), ros::YUV422},
+  {cam::NV21.fourcc(), ros::NV21},
+  {cam::NV24.fourcc(), ros::NV24},
   // Bayer encodings
   {cam::SRGGB8.fourcc(), ros::BAYER_RGGB8},
   {cam::SGRBG8.fourcc(), ros::BAYER_GRBG8},
