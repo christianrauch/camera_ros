@@ -15,6 +15,7 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
+#include <cv_bridge/cv_bridge.h>
 #include <functional>
 #include <iostream>
 #include <libcamera/base/shared_fd.h>
@@ -60,6 +61,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
 namespace rclcpp
 {
 class NodeOptions;
@@ -484,6 +486,8 @@ CameraNode::declareParameters()
 void
 CameraNode::requestComplete(libcamera::Request *request)
 {
+  const auto tstart = std::chrono::high_resolution_clock::now();
+
   request_lock.lock();
 
   if (request->status() == libcamera::Request::RequestComplete) {
@@ -505,6 +509,11 @@ CameraNode::requestComplete(libcamera::Request *request)
     hdr.stamp = rclcpp::Time(time_offset + int64_t(metadata.timestamp));
     hdr.frame_id = "camera";
     const libcamera::StreamConfiguration &cfg = stream->configuration();
+
+    const auto tprep = std::chrono::high_resolution_clock::now();
+
+    std::cout << "prep (ms): " << std::chrono::duration<float, std::milli>(tprep - tstart).count()
+              << std::endl;
 
     auto msg_img = std::make_unique<sensor_msgs::msg::Image>();
     auto msg_img_compressed = std::make_unique<sensor_msgs::msg::CompressedImage>();
@@ -533,13 +542,30 @@ CameraNode::requestComplete(libcamera::Request *request)
       memcpy(msg_img_compressed->data.data(), buffer_info[buffer].data, bytesused);
 
       // decompress into raw rgb8 image
-      //      cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
+      const auto tcmpr_jpg = std::chrono::high_resolution_clock::now();
       msg_img = decompress(msg_img_compressed);
+      std::cout << "decompr jpeg (ms): "
+                << std::chrono::duration<float, std::milli>(
+                     std::chrono::high_resolution_clock::now() - tcmpr_jpg)
+                     .count()
+                << std::endl;
+
+      const auto tcmpr_cv = std::chrono::high_resolution_clock::now();
+      cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
+      std::cout << "decompr cv (ms): "
+                << std::chrono::duration<float, std::milli>(
+                     std::chrono::high_resolution_clock::now() - tcmpr_cv)
+                     .count()
+                << std::endl;
     }
     else {
       throw std::runtime_error("unsupported pixel format: " +
                                stream->configuration().pixelFormat.toString());
     }
+
+    const auto timg = std::chrono::high_resolution_clock::now();
+    std::cout << "imgs (ms): " << std::chrono::duration<float, std::milli>(timg - tprep).count()
+              << std::endl;
 
     pub_image->publish(std::move(msg_img));
     pub_image_compressed->publish(std::move(msg_img_compressed));
@@ -547,10 +573,16 @@ CameraNode::requestComplete(libcamera::Request *request)
     sensor_msgs::msg::CameraInfo ci = cim.getCameraInfo();
     ci.header = hdr;
     pub_ci->publish(ci);
+
+    const auto tpub = std::chrono::high_resolution_clock::now();
+    std::cout << "pub (ms): " << std::chrono::duration<float, std::milli>(tpub - timg).count()
+              << std::endl;
   }
   else if (request->status() == libcamera::Request::RequestCancelled) {
     RCLCPP_ERROR_STREAM(get_logger(), "request '" << request->toString() << "' cancelled");
   }
+
+  const auto treuse_start = std::chrono::high_resolution_clock::now();
 
   // queue the request again for the next frame
   request->reuse(libcamera::Request::ReuseBuffers);
@@ -564,7 +596,18 @@ CameraNode::requestComplete(libcamera::Request *request)
 
   camera->queueRequest(request);
 
+  const auto treuse_end = std::chrono::high_resolution_clock::now();
+  std::cout << "reuse (ms): "
+            << std::chrono::duration<float, std::milli>(treuse_end - treuse_start).count()
+            << std::endl;
+
   request_lock.unlock();
+
+  std::cout << "TOTAL (ms): "
+            << std::chrono::duration<float, std::milli>(std::chrono::high_resolution_clock::now() -
+                                                        tstart)
+                 .count()
+            << std::endl;
 }
 
 rcl_interfaces::msg::SetParametersResult
