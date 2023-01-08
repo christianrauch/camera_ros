@@ -522,7 +522,8 @@ CameraNode::requestComplete(libcamera::Request *request)
       memcpy(msg_img->data.data(), buffer_info[buffer].data, buffer_info[buffer].size);
 
       // compress to jpeg
-      cv_bridge::toCvCopy(*msg_img)->toCompressedImageMsg(*msg_img_compressed);
+      if (pub_image_compressed->get_subscription_count())
+        cv_bridge::toCvCopy(*msg_img)->toCompressedImageMsg(*msg_img_compressed);
     }
     else if (format_type(cfg.pixelFormat) == FormatType::COMPRESSED) {
       // compressed image
@@ -533,7 +534,8 @@ CameraNode::requestComplete(libcamera::Request *request)
       memcpy(msg_img_compressed->data.data(), buffer_info[buffer].data, bytesused);
 
       // decompress into raw rgb8 image
-      cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
+      if (pub_image->get_subscription_count())
+        cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
     }
     else {
       throw std::runtime_error("unsupported pixel format: " +
