@@ -164,11 +164,20 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   // camera ID
   declare_parameter("camera", rclcpp::ParameterValue {}, param_descr_ro.set__dynamic_typing(true));
 
+  auto qos_override_options = rclcpp::QosOverridingOptions({
+    rclcpp::QosPolicyKind::Depth,
+    rclcpp::QosPolicyKind::History,
+    rclcpp::QosPolicyKind::Reliability,
+    rclcpp::QosPolicyKind::Durability,
+  });
+  
+  rclcpp::PublisherOptions pub_options;
+  pub_options.qos_overriding_options = qos_override_options;
   // publisher for raw and compressed image
-  pub_image = this->create_publisher<sensor_msgs::msg::Image>("~/image_raw", 1);
+  pub_image = this->create_publisher<sensor_msgs::msg::Image>("~/image_raw", 1, pub_options);
   pub_image_compressed =
-    this->create_publisher<sensor_msgs::msg::CompressedImage>("~/image_raw/compressed", 1);
-  pub_ci = this->create_publisher<sensor_msgs::msg::CameraInfo>("~/camera_info", 1);
+    this->create_publisher<sensor_msgs::msg::CompressedImage>("~/image_raw/compressed", 1, pub_options);
+  pub_ci = this->create_publisher<sensor_msgs::msg::CameraInfo>("~/camera_info", 1, pub_options);
 
   // start camera manager and check for cameras
   camera_manager.start();
