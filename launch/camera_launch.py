@@ -22,7 +22,7 @@ def generate_launch_description():
                     {"height": LaunchConfiguration("height")},
                     {"qos_overrides./camera/image_raw.publisher.reliability": "best_effort"},
                     {"qos_overrides./camera/image_raw/compressed.publisher.reliability": "best_effort"},
-                    {"qos_overrides./camera/camera_info.publisher.reliability": "best_effort"},
+                    # {"qos_overrides./camera/camera_info.publisher.reliability": "best_effort"},
                 ],
                 remappings=[],  # Add remappings if necessary.
                 arguments=["--log-level", LaunchConfiguration("log_level")],
