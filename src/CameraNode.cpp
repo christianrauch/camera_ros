@@ -394,6 +394,8 @@ CameraNode::declareParameters()
   // dynamic camera configuration
   ParameterMap parameters_init;
   for (const auto &[id, info] : camera->controls()) {
+    if (id->name() == "AfWindows")
+      continue;
     // store control id with name
     parameter_ids[id->name()] = id;
 
