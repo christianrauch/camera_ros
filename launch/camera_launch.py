@@ -20,6 +20,8 @@ def generate_launch_description():
                 parameters=[
                     {"width": LaunchConfiguration("width")},
                     {"height": LaunchConfiguration("height")},
+                    {"mode_width": 2304},
+                    {"mode_height": 1296},
                     {"qos_overrides./camera/image_raw.publisher.reliability": "best_effort"},
                     {"qos_overrides./camera/image_raw/compressed.publisher.reliability": "best_effort"},
                     # {"qos_overrides./camera/camera_info.publisher.reliability": "best_effort"},

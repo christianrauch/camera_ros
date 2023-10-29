@@ -21,6 +21,7 @@
 #include <libcamera/base/signal.h>
 #include <libcamera/base/span.h>
 #include <libcamera/camera.h>
+#include <libcamera/formats.h>
 #include <libcamera/camera_manager.h>
 #include <libcamera/controls.h>
 #include <libcamera/framebuffer.h>
@@ -161,6 +162,9 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   declare_parameter<int64_t>("width", {}, param_descr_ro);
   declare_parameter<int64_t>("height", {}, param_descr_ro);
 
+  declare_parameter<int64_t>("mode_width", {}, param_descr_ro);
+  declare_parameter<int64_t>("mode_height", {}, param_descr_ro);
+
   // camera ID
   declare_parameter("camera", rclcpp::ParameterValue {}, param_descr_ro.set__dynamic_typing(true));
 
@@ -225,9 +229,18 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   if (camera->acquire())
     throw std::runtime_error("failed to acquire camera");
 
+  std::vector<libcamera::StreamRole> roles;
+
+  roles.push_back(get_role(get_parameter("role").as_string()));
+  const libcamera::Size mode_size(get_parameter("mode_width").as_int(), get_parameter("mode_height").as_int());
+
+  if(!mode_size.isNull()) {
+    roles.push_back(libcamera::StreamRole::Raw);
+  }
+
   // configure camera stream
   std::unique_ptr<libcamera::CameraConfiguration> cfg =
-    camera->generateConfiguration({get_role(get_parameter("role").as_string())});
+    camera->generateConfiguration({roles});
 
   if (!cfg)
     throw std::runtime_error("failed to generate configuration");
@@ -275,6 +288,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   }
 
   const libcamera::Size size(get_parameter("width").as_int(), get_parameter("height").as_int());
+
   if (size.isNull()) {
     RCLCPP_INFO_STREAM(get_logger(), scfg);
     scfg.size = scfg.formats().sizes(scfg.pixelFormat).back();
@@ -283,6 +297,20 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   }
   else {
     scfg.size = size;
+  }
+
+  if(!mode_size.isNull()) {
+    RCLCPP_INFO_STREAM(get_logger(), mode_size);
+    libcamera::StreamConfiguration &modecfg = cfg->at(1);
+    modecfg.size = mode_size;
+
+    modecfg.pixelFormat = libcamera::formats::SBGGR12_CSI2P;
+
+    RCLCPP_INFO_STREAM(get_logger(), "modecfg ");
+    RCLCPP_INFO_STREAM(get_logger(), modecfg);
+
+    set_parameter(rclcpp::Parameter("mode_width", int64_t(modecfg.size.width)));
+    set_parameter(rclcpp::Parameter("mode_height", int64_t(modecfg.size.height)));
   }
 
   // store selected stream configuration
