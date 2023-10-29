@@ -123,6 +123,7 @@ The camera stream is configured once when the node starts via the following stat
 | `role`            | `string`              | configures the camera with a `StreamRole` (possible choices: `raw`, `still`, `video`, `viewfinder`) [default: `viewfinder`] |
 | `format`          | `string`              | a `PixelFormat` that is supported by the camera [default: auto]                                                             |
 | `width`, `height` | `integer`             | desired image resolution [default: auto]                                                                                    |
+| `mode_width`, `mode_height` | `integer`   | desired sensor mode resolution [default: auto]                                |
 
 
 The configuration is done in the following order:
@@ -130,6 +131,7 @@ The configuration is done in the following order:
 2. configure camera stream via `role`
 3. set the pixel format for the stream via `format`
 4. set the image resolution for the stream via `width` and `height`
+5. set the sensor mode resolution for the raw feed from camera to GPU
 
 Each stream role only supports a discrete set of data stream configurations as a combination of the image resolution and pixel format. The selected stream configuration is validated at the end of this sequence and adjusted to the closest valid stream configuration.
 
