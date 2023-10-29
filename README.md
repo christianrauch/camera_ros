@@ -123,6 +123,7 @@ The camera stream is configured once when the node starts via the following stat
 | `role`            | `string`              | configures the camera with a `StreamRole` (possible choices: `raw`, `still`, `video`, `viewfinder`) [default: `viewfinder`] |
 | `format`          | `string`              | a `PixelFormat` that is supported by the camera [default: auto]                                                             |
 | `width`, `height` | `integer`             | desired image resolution [default: auto]                                                                                    |
+| `sensor_mode`     | `string`              | desired raw sensor format resolution (format: `width:height`) [default: auto]                                               |
 
 
 The configuration is done in the following order:
@@ -130,12 +131,21 @@ The configuration is done in the following order:
 2. configure camera stream via `role`
 3. set the pixel format for the stream via `format`
 4. set the image resolution for the stream via `width` and `height`
+5. set the sensor mode resolution for the raw feed from camera to GPU
 
 Each stream role only supports a discrete set of data stream configurations as a combination of the image resolution and pixel format. The selected stream configuration is validated at the end of this sequence and adjusted to the closest valid stream configuration.
 
 By default, the node will select the first available camera and configures it with the default pixel format and image resolution. If a parameter has not been set, the node will print the available options and inform the user about the default choice.
 
 The node avoids memory copies of the image data by directly mapping from a camera pixel format to a ROS image format, with the exception of converting between "raw" and "compressed" image formats when requested by the user. As an effect, not all pixel formats that are supported by the camera may be supported by the ROS image message. Hence, the options for `format` are limited to pixel formats that are supported by the camera and the raw ROS image message.
+
+### Sensor Modes and Cropping
+
+Most camera modules provide different sensor modes, some of which provide a smaller resolution version of the full picture, whereas others have a limited field-of-view, e.g. by allowing for the selection of a 3:2 image from a 16:9 sensor, a more native 'digital zoom' effect by cropping the picture etc. The benefit of this is to perform compute intensive tasks at the source (the sensor), rather than downstream in the GPU or in application code. Unless we specify the sensor mode we want, libcamera will automatically select one. Unfortunately, it is not guaranteed that the selected mode will be a full sensor mode, leading to a potential cropping of the picture. 
+
+Example: When configuring a 640x480 output stream on a Raspberry Pi Camera Module v2, libcamera will automatically choose a heavily cropped 640x480 sensor mode, leading to a digital zoom of ~2.5x.
+
+See the [PiCamera2 Documentation, section 4.2.2.3](https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf) for a detailed explanation. The [PiCamera Documentation](https://picamera.readthedocs.io/en/release-1.13/fov.html#sensor-modes) has a good visualization of the issue. Read the documentation of your camera to see what modes are available, and which (if any) raw formats are cropped.
 
 ### Dynamic Frame Configuration (controls)
 
