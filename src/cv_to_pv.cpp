@@ -48,7 +48,7 @@ template<typename T,
 rclcpp::ParameterValue
 cv_to_pv_array(const std::vector<T> & /*values*/)
 {
-  throw std::runtime_error("ParameterValue only supported for arithmetic types");
+  throw invalid_conversion("ParameterValue only supported for arithmetic types");
 }
 
 template<

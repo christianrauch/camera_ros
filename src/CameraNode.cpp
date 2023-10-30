@@ -464,7 +464,17 @@ CameraNode::declareParameters()
       throw std::runtime_error("minimum and maximum parameter array sizes do not match");
 
     // clamp default ControlValue to min/max range and cast ParameterValue
-    const rclcpp::ParameterValue value = cv_to_pv(clamp(info.def(), info.min(), info.max()));
+    rclcpp::ParameterValue value;
+    try {
+      value = cv_to_pv(clamp(info.def(), info.min(), info.max()));
+    }
+    catch (const invalid_conversion &e) {
+      RCLCPP_ERROR_STREAM(get_logger(), "unsupported control '"
+                                          << id->name()
+                                          << "' (type: " << std::to_string(info.def().type()) << "): "
+                                          << e.what());
+      continue;
+    }
 
     // get smallest bounds for minimum and maximum set
     rcl_interfaces::msg::IntegerRange range_int;
