@@ -1,0 +1,39 @@
+name: camera_ros build
+
+on: [pull_request]
+
+jobs:
+  build:
+    name: camera_ros (${{ matrix.distribution }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - # latest LTS
+            version: 22.04
+            distribution: humble
+    continue-on-error: ${{ matrix.distribution == 'rolling' }}
+
+    container:
+      image: ubuntu:${{ matrix.version }}
+
+    steps:
+      - name: fetch source
+        uses: actions/checkout@v4
+
+      - name: install ROS2 ${{ matrix.distribution }}
+        uses: ros-tooling/setup-ros@v0.7
+
+      - name: build and test
+        uses: ros-tooling/action-ros-ci@v0.3
+        with:
+          package-name: camera_ros
+          target-ros2-distro: ${{ matrix.distribution }}
+          colcon-defaults: |
+            {
+              "build": {
+                "mixin": ["asan-gcc", "tsan", "coverage-gcc", "memcheck"]
+              }
+            }
+          colcon-mixin-repository: https://raw.githubusercontent.com/colcon/colcon-mixin-repository/5d51dff38097e8c2bf46d7a5b804e65935aa7f47/index.yaml
