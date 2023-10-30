@@ -451,10 +451,13 @@ CameraNode::declareParameters()
     }
 
     // format type description
+    const bool scalar = (extent == 0) || (extent == 1);
+    const bool dynamic = (extent == libcamera::dynamic_extent);
+    const std::string cv_type_descr =
+      scalar ? "scalar" : "array[" + (dynamic ? std::string() : std::to_string(extent)) + "]";
     const std::string cv_descr =
-      std::to_string(id->type()) + " " +
-      std::string(extent > 1 ? "array[" + std::to_string(extent) + "]" : "scalar") + " range {" +
-      info.min().toString() + "}..{" + info.max().toString() + "}" +
+      std::to_string(id->type()) + " " + cv_type_descr + " range {" + info.min().toString() +
+      "}..{" + info.max().toString() + "}" +
       (info.def().isNone() ? std::string {} : " (default: {" + info.def().toString() + "})");
 
     if (info.min().numElements() != info.max().numElements())
