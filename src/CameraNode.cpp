@@ -33,6 +33,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <opencv2/imgcodecs.hpp>
 #include <optional>
 #include <rcl/context.h>
 #include <rcl_interfaces/msg/detail/floating_point_range__struct.hpp>
@@ -48,6 +49,7 @@
 #include <rclcpp/qos_event.hpp>
 #include <rclcpp/time.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
+#include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/detail/camera_info__struct.hpp>
 #include <sensor_msgs/msg/detail/compressed_image__struct.hpp>
 #include <sensor_msgs/msg/detail/image__struct.hpp>
@@ -60,6 +62,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+namespace enc = sensor_msgs::image_encodings;
 namespace rclcpp
 {
 class NodeOptions;
@@ -108,6 +111,8 @@ private:
   // keep track of set parameters
   ParameterMap parameters_full;
   std::mutex parameters_lock;
+  // compression quality parameter
+  std::atomic_uint8_t jpeg_quality;
 
   void
   declareParameters();
@@ -164,6 +169,18 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   // camera ID
   declare_parameter("camera", rclcpp::ParameterValue {}, param_descr_ro.set__dynamic_typing(true));
 
+  rcl_interfaces::msg::ParameterDescriptor jpeg_quality_description;
+  jpeg_quality_description.name = "jpeg_quality";
+  jpeg_quality_description.type = rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER;
+  jpeg_quality_description.description = "Image quality for JPEG format";
+  jpeg_quality_description.read_only = false;
+  rcl_interfaces::msg::IntegerRange jpeg_range;
+  jpeg_range.from_value = 1;
+  jpeg_range.to_value = 100;
+  jpeg_range.step = 1;
+  jpeg_quality_description.integer_range = {jpeg_range};
+  // default to 95
+  jpeg_quality = declare_parameter<uint8_t>("jpeg_quality", 95, jpeg_quality_description);
   // publisher for raw and compressed image
   pub_image = this->create_publisher<sensor_msgs::msg::Image>("~/image_raw", 1);
   pub_image_compressed =
@@ -481,6 +498,40 @@ CameraNode::declareParameters()
   set_parameters(parameters_init_list);
 }
 
+// The following function "compressImageMsg" is adapted from "CvImage::toCompressedImageMsg"
+// (https://github.com/ros-perception/vision_opencv/blob/066793a23e5d06d76c78ca3d69824a501c3554fd/cv_bridge/src/cv_bridge.cpp#L512-L535)
+// and covered by the BSD-3-Clause licence.
+void
+compressImageMsg(const sensor_msgs::msg::Image &source,
+                 sensor_msgs::msg::CompressedImage &destination,
+                 const std::vector<int> &params = std::vector<int>())
+{
+  std::shared_ptr<CameraNode> tracked_object;
+  cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(source, tracked_object);
+
+  destination.header = source.header;
+  cv::Mat image;
+  if (cv_ptr->encoding == enc::BGR8 || cv_ptr->encoding == enc::BGRA8 ||
+      cv_ptr->encoding == enc::MONO8 || cv_ptr->encoding == enc::MONO16)
+  {
+    image = cv_ptr->image;
+  }
+  else {
+    cv_bridge::CvImagePtr tempThis = std::make_shared<cv_bridge::CvImage>(*cv_ptr);
+    cv_bridge::CvImagePtr temp;
+    if (enc::hasAlpha(cv_ptr->encoding)) {
+      temp = cv_bridge::cvtColor(tempThis, enc::BGRA8);
+    }
+    else {
+      temp = cv_bridge::cvtColor(tempThis, enc::BGR8);
+    }
+    image = temp->image;
+  }
+
+  destination.format = "jpg";
+  cv::imencode(".jpg", image, destination.data, params);
+}
+
 void
 CameraNode::requestComplete(libcamera::Request *request)
 {
@@ -523,7 +574,7 @@ CameraNode::requestComplete(libcamera::Request *request)
 
       // compress to jpeg
       if (pub_image_compressed->get_subscription_count())
-        cv_bridge::toCvCopy(*msg_img)->toCompressedImageMsg(*msg_img_compressed);
+        compressImageMsg(*msg_img, *msg_img_compressed, {cv::IMWRITE_JPEG_QUALITY, jpeg_quality});
     }
     else if (format_type(cfg.pixelFormat) == FormatType::COMPRESSED) {
       // compressed image
@@ -633,6 +684,9 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
 
         parameters_full[parameter.get_name()] = parameter.get_parameter_value();
       }
+    }
+    else if (!parameter.get_name().compare("jpeg_quality")) {
+      jpeg_quality = parameter.get_parameter_value().get<uint8_t>();
     }
   }
 
