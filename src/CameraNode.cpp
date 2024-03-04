@@ -425,18 +425,29 @@ CameraNode::declareParameters()
     }
 
     // format type description
+    const bool scalar = (extent == 0) || (extent == 1);
+    const bool dynamic = (extent == libcamera::dynamic_extent);
+    const std::string cv_type_descr =
+      scalar ? "scalar" : "array[" + (dynamic ? std::string() : std::to_string(extent)) + "]";
     const std::string cv_descr =
-      std::to_string(id->type()) + " " +
-      std::string(extent > 1 ? "array[" + std::to_string(extent) + "]" : "scalar") + " range {" +
-      info.min().toString() + "}..{" + info.max().toString() + "}" +
+      std::to_string(id->type()) + " " + cv_type_descr + " range {" + info.min().toString() +
+      "}..{" + info.max().toString() + "}" +
       (info.def().isNone() ? std::string {} : " (default: {" + info.def().toString() + "})");
 
     if (info.min().numElements() != info.max().numElements())
       throw std::runtime_error("minimum and maximum parameter array sizes do not match");
 
     // clamp default ControlValue to min/max range and cast ParameterValue
-    const rclcpp::ParameterValue value =
-      cv_to_pv(clamp(info.def(), info.min(), info.max()), extent);
+    rclcpp::ParameterValue value;
+    try {
+      value = cv_to_pv(clamp(info.def(), info.min(), info.max()));
+    }
+    catch (const invalid_conversion &e) {
+      RCLCPP_ERROR_STREAM(get_logger(), "unsupported control '" << id->name() << "' (type: "
+                                                                << std::to_string(info.def().type())
+                                                                << "): " << e.what());
+      continue;
+    }
 
     // get smallest bounds for minimum and maximum set
     rcl_interfaces::msg::IntegerRange range_int;
