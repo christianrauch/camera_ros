@@ -13,9 +13,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - # latest LTS
-            version: 22.04
+          - version: 22.04
             distribution: humble
+          - version: 24.04
+            distribution: jazzy
     continue-on-error: ${{ matrix.distribution == 'rolling' }}
 
     container:
