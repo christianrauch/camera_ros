@@ -200,6 +200,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     RCLCPP_INFO_STREAM(get_logger(), camera_manager);
     RCLCPP_WARN_STREAM(get_logger(),
                        "no camera selected, using default: \"" << camera->id() << "\"");
+    RCLCPP_WARN_STREAM(get_logger(), "set parameter 'camera' to silent this warning");
     break;
   case rclcpp::ParameterType::PARAMETER_INTEGER:
   {
@@ -262,6 +263,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
     RCLCPP_WARN_STREAM(get_logger(),
                        "no pixel format selected, using default: \"" << scfg.pixelFormat << "\"");
+    RCLCPP_WARN_STREAM(get_logger(), "set parameter 'format' to silent this warning");
   }
   else {
     // get pixel format from provided string
@@ -288,6 +290,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     scfg.size = scfg.formats().sizes(scfg.pixelFormat).back();
     RCLCPP_WARN_STREAM(get_logger(),
                        "no dimensions selected, auto-selecting: \"" << scfg.size << "\"");
+    RCLCPP_WARN_STREAM(get_logger(), "set parameter 'width' or 'height' to silent this warning");
   }
   else {
     scfg.size = size;
