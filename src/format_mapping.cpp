@@ -13,7 +13,7 @@ namespace ros = sensor_msgs::image_encodings;
 // see 'include/uapi/drm/drm_fourcc.h' for a full FourCC list
 
 // supported FourCC formats, without conversion
-const std::unordered_map<uint32_t, std::string> map_format_raw = {
+static const std::unordered_map<uint32_t, std::string> map_format_raw = {
   // RGB encodings
   // NOTE: Following the DRM definition, RGB formats codes are stored in little-endian order.
   {cam::R8.fourcc(), ros::MONO8},
@@ -38,7 +38,7 @@ const std::unordered_map<uint32_t, std::string> map_format_raw = {
 };
 
 // supported FourCC formats, without conversion, compressed
-const std::unordered_map<uint32_t, std::string> map_format_compressed = {
+static const std::unordered_map<uint32_t, std::string> map_format_compressed = {
   {cam::MJPEG.fourcc(), "jpeg"},
 };
 
@@ -61,4 +61,17 @@ format_type(const libcamera::PixelFormat &pixelformat)
   if (map_format_compressed.count(pixelformat.fourcc()))
     return FormatType::COMPRESSED;
   return FormatType::NONE;
+}
+
+libcamera::StreamFormats
+get_common_stream_formats(const libcamera::StreamFormats &formats)
+{
+  std::map<libcamera::PixelFormat, std::vector<libcamera::SizeRange>> common_stream_formats;
+  for (const libcamera::PixelFormat &fmt : formats.pixelformats()) {
+    if (format_type(fmt) != FormatType::NONE) {
+      common_stream_formats[fmt] = {formats.range(fmt)};
+    }
+  }
+
+  return {common_stream_formats};
 }

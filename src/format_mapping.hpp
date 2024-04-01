@@ -1,4 +1,5 @@
 #pragma once
+#include <libcamera/stream.h>
 #include <string>
 
 namespace libcamera
@@ -18,3 +19,6 @@ get_ros_encoding(const libcamera::PixelFormat &pixelformat);
 
 FormatType
 format_type(const libcamera::PixelFormat &pixelformat);
+
+libcamera::StreamFormats
+get_common_stream_formats(const libcamera::StreamFormats &formats);
