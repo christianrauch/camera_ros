@@ -200,6 +200,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     RCLCPP_INFO_STREAM(get_logger(), camera_manager);
     RCLCPP_WARN_STREAM(get_logger(),
                        "no camera selected, using default: \"" << camera->id() << "\"");
+    RCLCPP_WARN_STREAM(get_logger(), "set parameter 'camera' to silent this warning");
     break;
   case rclcpp::ParameterType::PARAMETER_INTEGER:
   {
@@ -241,27 +242,25 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     throw std::runtime_error("failed to generate configuration");
 
   libcamera::StreamConfiguration &scfg = cfg->at(0);
-  // store full list of stream formats
-  const libcamera::StreamFormats &stream_formats = scfg.formats();
-  const std::vector<libcamera::PixelFormat> &pixel_formats = scfg.formats().pixelformats();
+  // get common pixel formats that are supported by the camera and the node
+  const libcamera::StreamFormats stream_formats = get_common_stream_formats(scfg.formats());
+  const std::vector<libcamera::PixelFormat> common_fmt = stream_formats.pixelformats();
+
+  // list all camera formats, including those not supported by the ROS message
+  RCLCPP_DEBUG_STREAM(get_logger(), scfg.formats());
+
+  if (common_fmt.empty())
+    throw std::runtime_error("camera does not provide any of the supported pixel formats");
+
   const std::string format = get_parameter("format").as_string();
   if (format.empty()) {
+    // auto select first common pixel format
+    scfg.pixelFormat = common_fmt.front();
+
     RCLCPP_INFO_STREAM(get_logger(), stream_formats);
-    // check if the default pixel format is supported
-    if (format_type(scfg.pixelFormat) == FormatType::NONE) {
-      // find first supported pixel format available by camera
-      const auto result = std::find_if(
-        pixel_formats.begin(), pixel_formats.end(),
-        [](const libcamera::PixelFormat &fmt) { return format_type(fmt) != FormatType::NONE; });
-
-      if (result == pixel_formats.end())
-        throw std::runtime_error("camera does not provide any of the supported pixel formats");
-
-      scfg.pixelFormat = *result;
-    }
-
     RCLCPP_WARN_STREAM(get_logger(),
                        "no pixel format selected, using default: \"" << scfg.pixelFormat << "\"");
+    RCLCPP_WARN_STREAM(get_logger(), "set parameter 'format' to silent this warning");
   }
   else {
     // get pixel format from provided string
@@ -270,15 +269,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
       RCLCPP_INFO_STREAM(get_logger(), stream_formats);
       throw std::runtime_error("invalid pixel format: \"" + format + "\"");
     }
-    // check that requested format is supported by camera
-    if (std::find(pixel_formats.begin(), pixel_formats.end(), format_requested) ==
-        pixel_formats.end()) {
+    // check that the requested format is supported by camera and the node
+    if (std::find(common_fmt.begin(), common_fmt.end(), format_requested) == common_fmt.end()) {
       RCLCPP_INFO_STREAM(get_logger(), stream_formats);
-      throw std::runtime_error("pixel format \"" + format + "\" is unsupported by camera");
+      throw std::runtime_error("unsupported pixel format \"" + format + "\"");
     }
-    // check that requested format is supported by node
-    if (format_type(format_requested) == FormatType::NONE)
-      throw std::runtime_error("pixel format \"" + format + "\" is unsupported by node");
     scfg.pixelFormat = format_requested;
   }
 
@@ -288,6 +283,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     scfg.size = scfg.formats().sizes(scfg.pixelFormat).back();
     RCLCPP_WARN_STREAM(get_logger(),
                        "no dimensions selected, auto-selecting: \"" << scfg.size << "\"");
+    RCLCPP_WARN_STREAM(get_logger(), "set parameter 'width' or 'height' to silent this warning");
   }
   else {
     scfg.size = size;
