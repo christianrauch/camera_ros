@@ -124,6 +124,9 @@ ros2 run camera_ros camera_node --ros-args -p FrameDurationLimits:="[50000,50000
 
 ### Reporting bugs
 
+> [!IMPORTANT]
+> test
+
 ```sh
 colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug
 ```
