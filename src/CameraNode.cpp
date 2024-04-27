@@ -379,8 +379,12 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   // register callback
   camera->requestCompleted.connect(this, &CameraNode::requestComplete);
 
+  libcamera::ControlList controls_ = camera->controls();
+  for (const auto &[id, value] : parameters)
+    controls_.set(id, value);
+
   // start camera and queue all requests
-  if (camera->start())
+  if (camera->start(&controls_))
     throw std::runtime_error("failed to start camera");
 
   for (std::unique_ptr<libcamera::Request> &request : requests)
