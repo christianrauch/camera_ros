@@ -119,3 +119,25 @@ and then set via the control `FrameDurationLimits`, if it is exposed by the came
 # set fixed framerate of 20 Hz (50 ms)
 ros2 run camera_ros camera_node --ros-args -p FrameDurationLimits:="[50000,50000]"
 ```
+
+## FAQ & Trouble Shooting
+
+### Reporting bugs
+
+```sh
+colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug
+```
+
+```sh
+export LIBCAMERA_LOG_LEVELS=*:DEBUG
+ros2 run --prefix 'gdb -ex run --args' camera_ros camera_node --ros-args -p width:=160 -p height:=120
+```
+
+
+### Q&A
+
+Q1: The node exits with `no cameras available`.
+> A1: Check your camera connection and test with the libcamera examples that the camera is supported and accessible.
+
+Q2: The node exits with `Failed to allocate buffers`.
+> A2: The requested image size and pixel format may be too large. Set `width` and `height` to a lower resolution or chose a compressed pixel format.
