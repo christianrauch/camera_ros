@@ -168,3 +168,31 @@ and then run the node with libcamera and ROS debug information in `gdb`:
 ```sh
 LIBCAMERA_LOG_LEVELS=*:DEBUG ros2 run --prefix 'gdb -ex run --args' camera_ros camera_node --ros-args --log-level debug -p width:=640 -p height:=480
 ```
+
+
+### Common Issues
+
+#### No camera is detected (exception `no cameras available`)
+
+For standard V4L2 camera devices, check that its connection is detected (`lsusb`) and that it is also detected by V4L2 (`v4l2-ctl --list-devices`).
+
+On the Raspberry Pi, use `sudo vclog --msg` to inspect the VideoCore log messages for detected cameras. `vclog` is part of Raspberry Pi's `utils` repo at https://github.com/raspberrypi/utils. If this is not available in your distribution, such as Ubuntu, you have to build it from source:
+```sh
+# install build dependencies
+sudo apt -y install --no-install-recommends wget ca-certificates gcc libc6-dev
+# download vclog and build
+wget https://raw.githubusercontent.com/raspberrypi/utils/refs/heads/master/vclog/vclog.c
+gcc vclog.c -o vclog
+# show VideoCore log messages
+sudo ./vclog --msg
+```
+
+In the VideoCore log, you should find something like `Found camera 'ov5647' []` or `Found camera 'imx708' [...]`, which indicates the connected sensor, in these cases the _OmniVision OV5647_ and _Sony IMX708_. Look up this sensor in the [Raspberry Pi camera modules _Hardware Specification_](https://www.raspberrypi.com/documentation/accessories/camera.html#hardware-specification) and match the detected sensor with with the camera module. In this case, the _OmniVision OV5647_ image sensor belongs to the Camera Module 1 and the _Sony IMX708_ to the Camera Module 3.
+
+If you are using a Raspberry Pi Camera Module, make sure that it is supported by the libcamera variant that you have installed. For example, the official upstream libcamera supports the Camera Module 1 (OmniVision OV5647), while the Camera Module 3 (Sony IMX708) is currently only supported by the "raspberrypi" fork of libcamera. To verify that your camera is working with libcamera, build the `cam` example from the libcamera repo and list the camera devices with `cam -l`. For a camera with the _OmniVision OV5647_ sensor, this will show something like `'ov5647' (/base/axi/pcie@120000/rp1/i2c@88000/ov5647@36)` and for the _Sony IMX708_ something like `'imx708_wide' (/base/axi/pcie@120000/rp1/i2c@88000/imx708@1a)`.
+
+#### Buffer allocation issues (exception `Failed to allocate buffers`)
+
+If the node fails to allocate buffers, you are probably running out of video memory. This is most likely the case on resource constrained devices with limited memory, such as the Raspberry Pi Zero.
+
+To avoid this, either increase the video memory via `raspi-config`, or decrease the buffer size by reducing the image resolution (parameters `width` and `height`) and/or selecting a chroma subsampled or compressed pixel format that uses less bits per pixel (parameter `format`). For example, a raw format like `XRGB8888` uses 32 bits for each individual pixel, while a chroma subsampled format like `YUYV` only uses 32 bits per two pixels due to the subsampling of the colour components. For details on pixel formats, see the [Linux Kernel Image Formats documentation](https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/pixfmt.html).
