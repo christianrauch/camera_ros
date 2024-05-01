@@ -1,6 +1,9 @@
 name: camera_ros build
 
-on: [pull_request]
+on:
+  pull_request:
+    paths-ignore:
+      - "README.md"
 
 jobs:
   build:
