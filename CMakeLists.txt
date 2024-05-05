@@ -60,6 +60,11 @@ target_link_libraries(camera_component ${libcamera_LINK_LIBRARIES} utils)
 install(TARGETS camera_component
   DESTINATION lib)
 
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
+)
+
 if(BUILD_TESTING)
   set(ament_cmake_clang_format_CONFIG_FILE "${CMAKE_SOURCE_DIR}/.clang-format")
   find_package(ament_lint_auto REQUIRED)
