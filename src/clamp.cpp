@@ -11,20 +11,20 @@
 #include <vector>
 
 
-#define CASE_CLAMP(T)                                                                              \
-  case libcamera::ControlType##T:                                                                  \
+#define CASE_CLAMP(T)             \
+  case libcamera::ControlType##T: \
     return clamp<ControlTypeMap<libcamera::ControlType##T>::type>(value, min, max);
 
-#define CASE_NONE(T)                                                                               \
-  case libcamera::ControlType##T:                                                                  \
+#define CASE_NONE(T)              \
+  case libcamera::ControlType##T: \
     return {};
 
-#define MIN(T)                                                                                     \
-  template ControlTypeMap<libcamera::ControlType##T>::type min<libcamera::ControlType##T>(         \
+#define MIN(T)                                                                             \
+  template ControlTypeMap<libcamera::ControlType##T>::type min<libcamera::ControlType##T>( \
     const libcamera::ControlValue &);
 
-#define MAX(T)                                                                                     \
-  template ControlTypeMap<libcamera::ControlType##T>::type max<libcamera::ControlType##T>(         \
+#define MAX(T)                                                                             \
+  template ControlTypeMap<libcamera::ControlType##T>::type max<libcamera::ControlType##T>( \
     const libcamera::ControlValue &);
 
 template<enum libcamera::ControlType T>
@@ -109,8 +109,7 @@ clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
                          : std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
 }
 
-template<typename T,
-         std::enable_if_t<std::is_same<std::remove_cv_t<T>, CTBool>::value, bool> = true>
+template<typename T, std::enable_if_t<std::is_same<std::remove_cv_t<T>, CTBool>::value, bool> = true>
 const libcamera::ControlValue &
 clamp(const libcamera::ControlValue &value, const libcamera::ControlValue & /*min*/,
       const libcamera::ControlValue & /*max*/)
@@ -218,12 +217,12 @@ greater(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs)
   }
 }
 
-#define CASE_LESS(T)                                                                               \
-  case libcamera::ControlType##T:                                                                  \
+#define CASE_LESS(T)              \
+  case libcamera::ControlType##T: \
     return less<ControlTypeMap<libcamera::ControlType##T>::type>(lhs, rhs);
 
-#define CASE_GREATER(T)                                                                            \
-  case libcamera::ControlType##T:                                                                  \
+#define CASE_GREATER(T)           \
+  case libcamera::ControlType##T: \
     return greater<ControlTypeMap<libcamera::ControlType##T>::type>(lhs, rhs);
 
 bool

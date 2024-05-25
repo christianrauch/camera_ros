@@ -8,10 +8,10 @@
 #include <type_traits>
 
 
-#define LIBCAMERA_VER_GE(major, minor, patch)                                                      \
-  ((major < LIBCAMERA_VERSION_MAJOR) ||                                                            \
-   (major == LIBCAMERA_VERSION_MAJOR && minor < LIBCAMERA_VERSION_MINOR) ||                        \
-   (major == LIBCAMERA_VERSION_MAJOR && minor == LIBCAMERA_VERSION_MINOR &&                        \
+#define LIBCAMERA_VER_GE(major, minor, patch)                               \
+  ((major < LIBCAMERA_VERSION_MAJOR) ||                                     \
+   (major == LIBCAMERA_VERSION_MAJOR && minor < LIBCAMERA_VERSION_MINOR) || \
+   (major == LIBCAMERA_VERSION_MAJOR && minor == LIBCAMERA_VERSION_MINOR && \
     patch <= LIBCAMERA_VERSION_PATCH))
 
 
@@ -29,8 +29,8 @@ get_extent(const libcamera::Control<T> &)
   return libcamera::Control<T>::type::extent;
 }
 
-#define IF(T)                                                                                      \
-  if (id->id() == libcamera::controls::T.id())                                                     \
+#define IF(T)                                  \
+  if (id->id() == libcamera::controls::T.id()) \
     return get_extent(libcamera::controls::T);
 
 

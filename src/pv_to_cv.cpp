@@ -56,8 +56,8 @@ pv_to_cv(const rclcpp::Parameter &parameter, const libcamera::ControlType &type)
   case rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY:
   {
     // convert to float vector
-    return {libcamera::Span<const CTFloat>(std::vector<CTFloat>(
-      parameter.as_double_array().begin(), parameter.as_double_array().end()))};
+    return {libcamera::Span<const CTFloat>(
+      std::vector<CTFloat>(parameter.as_double_array().begin(), parameter.as_double_array().end()))};
   }
   case rclcpp::ParameterType::PARAMETER_STRING_ARRAY:
     return {libcamera::Span<const CTString>(parameter.as_string_array())};
