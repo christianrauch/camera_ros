@@ -14,7 +14,11 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
+#if __has_include(<cv_bridge/cv_bridge.hpp>)
+#include <cv_bridge/cv_bridge.hpp>
+#elif __has_include(<cv_bridge/cv_bridge.h>)
 #include <cv_bridge/cv_bridge.h>
+#endif
 #include <functional>
 #include <iostream>
 #include <libcamera/base/shared_fd.h>
