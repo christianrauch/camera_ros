@@ -50,7 +50,6 @@
 #include <rclcpp/parameter.hpp>
 #include <rclcpp/parameter_value.hpp>
 #include <rclcpp/publisher.hpp>
-#include <rclcpp/qos_event.hpp>
 #include <rclcpp/time.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <sensor_msgs/image_encodings.hpp>
