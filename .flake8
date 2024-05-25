@@ -1,0 +1,2 @@
+[flake8]
+ignore = Q000, D100
