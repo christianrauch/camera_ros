@@ -389,7 +389,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   // create a processing thread per request
   for (const std::unique_ptr<libcamera::Request> &request : requests) {
     request_locks[request.get()] = std::make_unique<std::mutex>();
-    request_locks[request.get()]->try_lock();
+    request_locks[request.get()]->lock();
     running = true;
     request_threads.emplace_back(&CameraNode::process, this, request.get());
   }
