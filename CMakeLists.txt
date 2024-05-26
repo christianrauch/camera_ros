@@ -15,6 +15,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
 find_package(camera_info_manager REQUIRED)
 find_package(cv_bridge REQUIRED)
 pkg_check_modules(libcamera REQUIRED libcamera>=0.1)
@@ -46,6 +47,7 @@ set(PACKAGE_DEPENDENCIES
   "rclcpp"
   "rclcpp_components"
   "sensor_msgs"
+  "diagnostic_msgs"
   "camera_info_manager"
   "cv_bridge"
 )
