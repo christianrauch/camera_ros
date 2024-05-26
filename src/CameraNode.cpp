@@ -259,8 +259,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
   const std::string format = get_parameter("format").as_string();
   if (format.empty()) {
-    // auto select first common pixel format
-    scfg.pixelFormat = common_fmt.front();
+    // check that the default pixel format is supported by the ROS encoding
+    if (std::find(common_fmt.cbegin(), common_fmt.cend(), scfg.pixelFormat) == common_fmt.cend()) {
+      // auto select first common pixel format
+      scfg.pixelFormat = common_fmt.front();
+    }
 
     RCLCPP_INFO_STREAM(get_logger(), stream_formats);
     RCLCPP_WARN_STREAM(get_logger(),
@@ -285,7 +288,6 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   const libcamera::Size size(get_parameter("width").as_int(), get_parameter("height").as_int());
   if (size.isNull()) {
     RCLCPP_INFO_STREAM(get_logger(), scfg);
-    scfg.size = scfg.formats().sizes(scfg.pixelFormat).back();
     RCLCPP_WARN_STREAM(get_logger(),
                        "no dimensions selected, auto-selecting: \"" << scfg.size << "\"");
     RCLCPP_WARN_STREAM(get_logger(), "set parameter 'width' or 'height' to silent this warning");
