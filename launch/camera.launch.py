@@ -1,16 +1,16 @@
-import launch
+from launch.launch_description import LaunchDescription
 
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
 
-def generate_launch_description() -> launch.LaunchDescription:
+def generate_launch_description() -> LaunchDescription:
     """
     Generate a launch description with for the camera node and a visualiser.
 
     Returns
     -------
-        launch.LaunchDescription: the launch description
+        LaunchDescription: the launch description
 
     """
     container = ComposableNodeContainer(
@@ -38,4 +38,4 @@ def generate_launch_description() -> launch.LaunchDescription:
         ],
     )
 
-    return launch.LaunchDescription([container])
+    return LaunchDescription([container])
