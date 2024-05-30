@@ -4,12 +4,12 @@
 #include <libcamera/geometry.h>
 #include <string>
 
-#define MAP(T, N)                                                                                  \
-  template<>                                                                                       \
-  struct ControlTypeMap<libcamera::details::control_type<T>::value>                                \
-  {                                                                                                \
-    using type = T;                                                                                \
-  };                                                                                               \
+#define MAP(T, N)                                                   \
+  template<>                                                        \
+  struct ControlTypeMap<libcamera::details::control_type<T>::value> \
+  {                                                                 \
+    using type = T;                                                 \
+  };                                                                \
   typedef ControlTypeMap<libcamera::ControlType##N>::type CT##N;
 
 

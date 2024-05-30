@@ -2,8 +2,8 @@
 #include <libcamera/controls.h>
 
 
-#define CASE_TYPE(T)                                                                               \
-  case libcamera::ControlType##T:                                                                  \
+#define CASE_TYPE(T)              \
+  case libcamera::ControlType##T: \
     return #T;
 
 std::string

@@ -11,12 +11,12 @@
 #include <vector>
 
 
-#define CASE_CONVERT(T)                                                                            \
-  case libcamera::ControlType##T:                                                                  \
+#define CASE_CONVERT(T)           \
+  case libcamera::ControlType##T: \
     return cv_to_pv(extract_value<ControlTypeMap<libcamera::ControlType##T>::type>(value), extent);
 
-#define CASE_NONE(T)                                                                               \
-  case libcamera::ControlType##T:                                                                  \
+#define CASE_NONE(T)              \
+  case libcamera::ControlType##T: \
     return {};
 
 
@@ -33,9 +33,9 @@ extract_value(const libcamera::ControlValue &value)
   }
 }
 
-template<typename T,
-         std::enable_if_t<std::is_arithmetic<T>::value || std::is_same<std::string, T>::value,
-                          bool> = true>
+template<
+  typename T,
+  std::enable_if_t<std::is_arithmetic<T>::value || std::is_same<std::string, T>::value, bool> = true>
 rclcpp::ParameterValue
 cv_to_pv_array(const std::vector<T> &values)
 {
@@ -51,9 +51,9 @@ cv_to_pv_array(const std::vector<T> & /*values*/)
   throw std::runtime_error("ParameterValue only supported for arithmetic types");
 }
 
-template<typename T,
-         std::enable_if_t<std::is_arithmetic<T>::value || std::is_same<std::string, T>::value,
-                          bool> = true>
+template<
+  typename T,
+  std::enable_if_t<std::is_arithmetic<T>::value || std::is_same<std::string, T>::value, bool> = true>
 rclcpp::ParameterValue
 cv_to_pv_scalar(const T &value)
 {
@@ -79,8 +79,7 @@ cv_to_pv(const std::vector<T> &values, const std::size_t &extent)
 {
   if ((values.size() > 1 && extent > 1) && (values.size() != extent))
     throw std::runtime_error("type extent (" + std::to_string(extent) + ") and value size (" +
-                             std::to_string(values.size()) +
-                             ") cannot be larger than 1 and differ");
+                             std::to_string(values.size()) + ") cannot be larger than 1 and differ");
 
   if (values.size() > 1)
     return cv_to_pv_array(values);

@@ -14,7 +14,11 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
+#if __has_include(<cv_bridge/cv_bridge.hpp>)
+#include <cv_bridge/cv_bridge.hpp>
+#elif __has_include(<cv_bridge/cv_bridge.h>)
 #include <cv_bridge/cv_bridge.h>
+#endif
 #include <functional>
 #include <iostream>
 #include <libcamera/base/shared_fd.h>
@@ -46,7 +50,6 @@
 #include <rclcpp/parameter.hpp>
 #include <rclcpp/parameter_value.hpp>
 #include <rclcpp/publisher.hpp>
-#include <rclcpp/qos_event.hpp>
 #include <rclcpp/time.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <sensor_msgs/image_encodings.hpp>
@@ -386,7 +389,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   // create a processing thread per request
   for (const std::unique_ptr<libcamera::Request> &request : requests) {
     request_locks[request.get()] = std::make_unique<std::mutex>();
-    request_locks[request.get()]->try_lock();
+    request_locks[request.get()]->lock();
     running = true;
     request_threads.emplace_back(&CameraNode::process, this, request.get());
   }
@@ -453,8 +456,7 @@ CameraNode::declareParameters()
       throw std::runtime_error("minimum and maximum parameter array sizes do not match");
 
     // clamp default ControlValue to min/max range and cast ParameterValue
-    const rclcpp::ParameterValue value =
-      cv_to_pv(clamp(info.def(), info.min(), info.max()), extent);
+    const rclcpp::ParameterValue value = cv_to_pv(clamp(info.def(), info.min(), info.max()), extent);
 
     // get smallest bounds for minimum and maximum set
     rcl_interfaces::msg::IntegerRange range_int;
