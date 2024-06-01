@@ -30,7 +30,11 @@ jobs:
 
       - name: colcon lint dependencies
         run: |
+          apt install -y python3-venv
           apt install -y apt-rdepends ros-${{ matrix.distribution }}-launch-ros
+          python3 -m venv ~/.venvs/dev
+          . ~/.venvs/dev/bin/activate
+          pip install colcon-ros lark
           pip install colcon-lint
 
       - name: build and test
@@ -51,4 +55,5 @@ jobs:
         working-directory: ${{ steps.action_ros_ci.outputs.ros-workspace-directory-name }}
         run: |
           . install/setup.sh
+          . ~/.venvs/dev/bin/activate
           colcon lint
