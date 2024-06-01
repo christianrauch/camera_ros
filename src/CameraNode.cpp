@@ -419,7 +419,10 @@ CameraNode::~CameraNode()
   // stop camera
   if (camera->stop())
     std::cerr << "failed to stop camera" << std::endl;
+  allocator->free(stream);
+  allocator.reset();
   camera->release();
+  camera.reset();
   camera_manager.stop();
   for (const auto &e : buffer_info)
     if (munmap(e.second.data, e.second.size) == -1)
