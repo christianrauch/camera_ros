@@ -13,7 +13,6 @@ find_package(ament_cmake REQUIRED)
 # run with "ASAN_OPTIONS=fast_unwind_on_malloc=0" to print stack with more details
 # ASAN_OPTIONS=alloc_dealloc_mismatch=0:new_delete_type_mismatch=0:fast_unwind_on_malloc=0 <exec>
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-    -fsanitize=address \
     -fsanitize=bool \
     -fsanitize=bounds \
     -fsanitize=enum \
@@ -25,8 +24,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
     -fsanitize=undefined \
     -fsanitize=vla-bound \
     -fno-sanitize=alignment \
-    -fsanitize=leak \
     -fsanitize=object-size \
+    -fsanitize=thread \
 ")
 
 find_package(PkgConfig REQUIRED)
