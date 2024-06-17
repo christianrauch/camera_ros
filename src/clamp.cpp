@@ -181,7 +181,17 @@ less(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs)
       return false;
     }
   }
+  else if (rhs.isArray()) {
+    // scalar-array comparison
+    const libcamera::Span<const T> vb = rhs.get<libcamera::Span<const T>>();
+    const T va = lhs.get<T>();
+    for (size_t i = 0; i < vb.size(); i++)
+      if (va < vb[i])
+        return true;
+    return false;
+  }
   else {
+    assert(!lhs.isArray() && !rhs.isArray());
     // scalar-scalar comparison
     return lhs.get<T>() < rhs.get<T>();
   }
@@ -211,7 +221,17 @@ greater(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs)
       return false;
     }
   }
+  else if (rhs.isArray()) {
+    // scalar-array comparison
+    const libcamera::Span<const T> vb = rhs.get<libcamera::Span<const T>>();
+    const T va = lhs.get<T>();
+    for (size_t i = 0; i < vb.size(); i++)
+      if (va > vb[i])
+        return true;
+    return false;
+  }
   else {
+    assert(!lhs.isArray() && !rhs.isArray());
     // scalar-scalar comparison
     return lhs.get<T>() > rhs.get<T>();
   }
