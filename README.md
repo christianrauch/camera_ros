@@ -133,7 +133,7 @@ colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug
 
 ```sh
 export LIBCAMERA_LOG_LEVELS=*:DEBUG
-ros2 run --prefix 'gdb -ex run --args' camera_ros camera_node --ros-args -p width:=160 -p height:=120
+ros2 run --prefix 'gdb -ex run --args' camera_ros camera_node --ros-args --log-level debug -p width:=160 -p height:=120
 ```
 
 
