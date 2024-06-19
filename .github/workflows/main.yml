@@ -13,9 +13,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - # latest LTS
-            version: 22.04
+          - version: 22.04
             distribution: humble
+          - version: 24.04
+            distribution: jazzy
     continue-on-error: ${{ matrix.distribution == 'rolling' }}
 
     container:
@@ -28,8 +29,18 @@ jobs:
       - name: install ROS2 ${{ matrix.distribution }}
         uses: ros-tooling/setup-ros@v0.7
 
+      - name: colcon lint dependencies
+        run: |
+          apt install -y python3-venv
+          apt install -y apt-rdepends ros-${{ matrix.distribution }}-launch-ros
+          python3 -m venv ~/.venvs/dev
+          . ~/.venvs/dev/bin/activate
+          pip install colcon-ros lark
+          pip install colcon-lint
+
       - name: build and test
         uses: ros-tooling/action-ros-ci@v0.3
+        id: action_ros_ci
         with:
           package-name: camera_ros
           target-ros2-distro: ${{ matrix.distribution }}
@@ -40,3 +51,10 @@ jobs:
               }
             }
           colcon-mixin-repository: https://raw.githubusercontent.com/colcon/colcon-mixin-repository/5d51dff38097e8c2bf46d7a5b804e65935aa7f47/index.yaml
+
+      - name: colcon lint
+        working-directory: ${{ steps.action_ros_ci.outputs.ros-workspace-directory-name }}
+        run: |
+          . install/setup.sh
+          . ~/.venvs/dev/bin/activate
+          colcon lint
