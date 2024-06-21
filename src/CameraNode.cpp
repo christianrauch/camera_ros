@@ -715,9 +715,12 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
         }
 
         const std::size_t extent = get_extent(id);
-        if ((value.isArray() && (extent > 0)) && value.numElements() != extent) {
+        if (value.isArray() &&
+            (extent != libcamera::dynamic_extent) &&
+            (value.numElements() != extent))
+        {
           result.successful = false;
-          result.reason = parameter.get_name() + ": parameter dimensions mismatch, expected " +
+          result.reason = parameter.get_name() + ": array dimensions mismatch, expected " +
                           std::to_string(extent) + ", got " + std::to_string(value.numElements());
           return result;
         }
