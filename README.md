@@ -147,3 +147,15 @@ The node uses the `CameraInfoManager` to manage the [camera parameters](https://
 If the camera has not been calibrated yet and the calibration file does not exist, the node will warn the user about the missing file (`Camera calibration file ~/.ros/camera_info/$NAME.yaml not found`) and publish zero-initialised intrinsic parameters. If you do not need to project between the 2D image plane and the 3D camera frame or rectify the image, you can safely ignore this.
 
 To calibrate the camera and set the parameters, you can use the [`cameracalibrator`](https://docs.ros.org/en/rolling/p/camera_calibration/) from the `camera_calibration` package or any other node that interfaces with the `~/set_camera_info` service.
+
+
+## Trouble Shooting
+
+To debug the node, first compile it in `Debug` mode:
+```sh
+colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug
+```
+and then run the node with libcamera and ROS debug information in `gdb`:
+```sh
+LIBCAMERA_LOG_LEVELS=*:DEBUG ros2 run --prefix 'gdb -ex run --args' camera_ros camera_node --ros-args --log-level debug -p width:=640 -p height:=480
+```
