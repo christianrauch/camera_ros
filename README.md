@@ -69,6 +69,25 @@ and an example launch file for the composable node:
 ros2 launch camera_ros camera.launch.py
 ```
 
+## Interfaces
+
+The camera node interfaces are compatible with the `image_pipeline` stack. The node publishes the camera images and camera parameters and provides a service to set the camera parameters.
+
+### Topics
+
+| name                     | type                              | description        |
+| ------------------------ | --------------------------------- | ------------------ |
+| `~/image_raw`            | `sensor_msgs/msg/Image`           | image              |
+| `~/image_raw/compressed` | `sensor_msgs/msg/CompressedImage` | image (compressed) |
+| `~/camera_info`          | `sensor_msgs/msg/CameraInfo`      | camera parameters  |
+
+### Services
+
+| name                | type                            | description           |
+| ------------------- | ------------------------------- | --------------------- |
+| `~/set_camera_info` | `sensor_msgs/srv/SetCameraInfo` | set camera parameters |
+
+
 ## Parameters
 
 The node provides two sets of parameters:
@@ -119,3 +138,12 @@ and then set via the control `FrameDurationLimits`, if it is exposed by the came
 # set fixed framerate of 20 Hz (50 ms)
 ros2 run camera_ros camera_node --ros-args -p FrameDurationLimits:="[50000,50000]"
 ```
+
+
+## Calibration
+
+The node uses the `CameraInfoManager` to manage the [camera parameters](https://docs.ros.org/en/rolling/p/image_pipeline/camera_info.html), such as the camera intrinsics for projection and distortion coefficients for rectification. Its tasks include loading the parameters from the calibration file `~/.ros/camera_info/$NAME.yaml`, publishing them on `~/camera_info` and setting new parameters via service `~/set_camera_info`.
+
+If the camera has not been calibrated yet and the calibration file does not exist, the node will warn the user about the missing file (`Camera calibration file ~/.ros/camera_info/$NAME.yaml not found`) and publish zero-initialised intrinsic parameters. If you do not need to project between the 2D image plane and the 3D camera frame or rectify the image, you can safely ignore this.
+
+To calibrate the camera and set the parameters, you can use the [`cameracalibrator`](https://docs.ros.org/en/rolling/p/camera_calibration/) from the `camera_calibration` package or any other node that interfaces with the `~/set_camera_info` service.
