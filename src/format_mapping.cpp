@@ -9,8 +9,10 @@
 namespace cam = libcamera::formats;
 namespace ros = sensor_msgs::image_encodings;
 
-//mapping of FourCC to ROS image encodings
-// see 'include/uapi/drm/drm_fourcc.h' for a full FourCC list
+// mapping of FourCC to ROS image encodings
+// references:
+// - full list of FourCC: 'include/uapi/drm/drm_fourcc.h'
+// - V4L2 image formats: 'https://docs.kernel.org/userspace-api/media/v4l/pixfmt.html'
 
 // supported FourCC formats, without conversion
 static const std::unordered_map<uint32_t, std::string> map_format_raw = {
