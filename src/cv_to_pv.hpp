@@ -15,4 +15,4 @@ rclcpp::ParameterValue
 cv_to_pv(const libcamera::ControlValue &value);
 
 rclcpp::ParameterType
-cv_to_pv_type(const libcamera::ControlType &type, const bool is_array);
+cv_to_pv_type(const libcamera::ControlId *const id);
