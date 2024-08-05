@@ -451,7 +451,7 @@ CameraNode::declareParameters()
     }
 
     // format type description
-    const bool scalar = (extent == 0) || (extent == 1);
+    const bool scalar = (extent == 0);
     const bool dynamic = (extent == libcamera::dynamic_extent);
     const std::string cv_type_descr =
       scalar ? "scalar" : "array[" + (dynamic ? std::string() : std::to_string(extent)) + "]";
