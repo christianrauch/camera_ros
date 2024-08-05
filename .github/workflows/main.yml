@@ -35,7 +35,7 @@ jobs:
           apt install -y apt-rdepends ros-${{ matrix.distribution }}-launch-ros
           python3 -m venv ~/.venvs/dev
           . ~/.venvs/dev/bin/activate
-          pip install colcon-ros lark
+          pip install lark
           pip install colcon-lint
 
       - name: build and test

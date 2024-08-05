@@ -19,6 +19,7 @@ template<typename T, std::enable_if_t<!libcamera::details::is_span<T>::value, bo
 std::size_t
 get_extent(const libcamera::Control<T> &)
 {
+  // return an extent of 0 for non-span types
   return 0;
 }
 
@@ -26,7 +27,12 @@ template<typename T, std::enable_if_t<libcamera::details::is_span<T>::value, boo
 std::size_t
 get_extent(const libcamera::Control<T> &)
 {
-  return libcamera::Control<T>::type::extent;
+  // return the span extent, excluding 0
+  // This assumes that libcamera does not define control types
+  // with a fixed size span that does not hold any elements
+  constexpr std::size_t extent = libcamera::Control<T>::type::extent;
+  static_assert(extent != 0);
+  return extent;
 }
 
 #define IF(T)                                  \
@@ -35,7 +41,7 @@ get_extent(const libcamera::Control<T> &)
 
 
 std::size_t
-get_extent(const libcamera::ControlId *id)
+get_extent(const libcamera::ControlId *const id)
 {
 #if LIBCAMERA_VER_GE(0, 1, 0)
   IF(AeEnable)
