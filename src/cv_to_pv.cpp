@@ -1,4 +1,5 @@
 #include "cv_to_pv.hpp"
+#include "type_extent.hpp"
 #include "types.hpp"
 #include <cstdint>
 #include <libcamera/base/span.h>
@@ -109,10 +110,10 @@ cv_to_pv(const libcamera::ControlValue &value)
 }
 
 rclcpp::ParameterType
-cv_to_pv_type(const libcamera::ControlType &type, const bool is_array)
+cv_to_pv_type(const libcamera::ControlId *const id)
 {
-  if (!is_array) {
-    switch (type) {
+  if (get_extent(id) == 0) {
+    switch (id->type()) {
     case libcamera::ControlType::ControlTypeNone:
       return rclcpp::ParameterType::PARAMETER_NOT_SET;
     case libcamera::ControlType::ControlTypeBool:
@@ -132,7 +133,7 @@ cv_to_pv_type(const libcamera::ControlType &type, const bool is_array)
     }
   }
   else {
-    switch (type) {
+    switch (id->type()) {
     case libcamera::ControlType::ControlTypeNone:
       return rclcpp::ParameterType::PARAMETER_NOT_SET;
     case libcamera::ControlType::ControlTypeBool:

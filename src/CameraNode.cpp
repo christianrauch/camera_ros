@@ -508,7 +508,7 @@ CameraNode::declareParameters()
     RCLCPP_DEBUG_STREAM(get_logger(),
                         "declare " << id->name() << " with default " << rclcpp::to_string(value));
     if (value.get_type() == rclcpp::ParameterType::PARAMETER_NOT_SET) {
-      declare_parameter(id->name(), cv_to_pv_type(id->type(), extent > 0), param_descr);
+      declare_parameter(id->name(), cv_to_pv_type(id), param_descr);
     }
     else {
       declare_parameter(id->name(), value, param_descr);
