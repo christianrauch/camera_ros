@@ -22,23 +22,34 @@ pkg_check_modules(libcamera REQUIRED libcamera>=0.1)
 
 # library with common utility functions for type conversions
 add_library(utils OBJECT
-  src/clamp.cpp
-  src/cv_to_pv.cpp
   src/format_mapping.cpp
-  src/parameter_conflict_check.cpp
   src/pretty_print.cpp
-  src/pv_to_cv.cpp
-  src/types.cpp
-  src/type_extent.cpp
 )
 target_include_directories(utils PUBLIC ${libcamera_INCLUDE_DIRS})
 target_link_libraries(utils ${libcamera_LINK_LIBRARIES})
 ament_target_dependencies(
   utils
-  "rclcpp"
   "sensor_msgs"
 )
 set_property(TARGET utils PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+# library for parameter/controls handling and conversion
+add_library(param OBJECT
+    src/clamp.cpp
+    src/cv_to_pv.cpp
+    src/parameter_conflict_check.cpp
+    src/pv_to_cv.cpp
+    src/types.cpp
+    src/type_extent.cpp
+    src/ParameterHandler.cpp
+)
+target_include_directories(param PUBLIC ${libcamera_INCLUDE_DIRS})
+target_link_libraries(param ${libcamera_LINK_LIBRARIES})
+ament_target_dependencies(
+  param
+  "rclcpp"
+)
+set_property(TARGET param PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # composable ROS2 node
 add_library(camera_component SHARED src/CameraNode.cpp)
@@ -57,7 +68,7 @@ ament_target_dependencies(
 )
 
 target_include_directories(camera_component PUBLIC ${libcamera_INCLUDE_DIRS})
-target_link_libraries(camera_component ${libcamera_LINK_LIBRARIES} utils)
+target_link_libraries(camera_component ${libcamera_LINK_LIBRARIES} utils param)
 
 install(TARGETS camera_component
   DESTINATION lib)
