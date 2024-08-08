@@ -38,6 +38,16 @@ ament_target_dependencies(
 )
 set_property(TARGET utils PROPERTY POSITION_INDEPENDENT_CODE ON)
 
+add_library(param OBJECT
+    src/ParameterHandler.cpp
+)
+target_include_directories(param PUBLIC ${libcamera_INCLUDE_DIRS})
+ament_target_dependencies(
+  param
+  "rclcpp"
+)
+set_property(TARGET param PROPERTY POSITION_INDEPENDENT_CODE ON)
+
 # composable ROS2 node
 add_library(camera_component SHARED src/CameraNode.cpp)
 rclcpp_components_register_node(camera_component PLUGIN "camera::CameraNode" EXECUTABLE "camera_node")
@@ -55,7 +65,7 @@ ament_target_dependencies(
 )
 
 target_include_directories(camera_component PUBLIC ${libcamera_INCLUDE_DIRS})
-target_link_libraries(camera_component ${libcamera_LINK_LIBRARIES} utils)
+target_link_libraries(camera_component ${libcamera_LINK_LIBRARIES} utils param)
 
 install(TARGETS camera_component
   DESTINATION lib)
