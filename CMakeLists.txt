@@ -31,6 +31,7 @@ add_library(utils OBJECT
   src/type_extent.cpp
 )
 target_include_directories(utils PUBLIC ${libcamera_INCLUDE_DIRS})
+target_link_libraries(utils ${libcamera_LINK_LIBRARIES})
 ament_target_dependencies(
   utils
   "rclcpp"
