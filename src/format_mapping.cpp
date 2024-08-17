@@ -1,9 +1,14 @@
 #include "format_mapping.hpp"
 #include <cstdint>
 #include <libcamera/formats.h>
+#include <libcamera/geometry.h>
 #include <libcamera/pixel_format.h>
+#include <libcamera/stream.h>
+#include <map>
 #include <sensor_msgs/image_encodings.hpp>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 
 namespace cam = libcamera::formats;

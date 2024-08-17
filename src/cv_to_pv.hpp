@@ -1,7 +1,13 @@
 #pragma once
-#include <cstddef>
-#include <libcamera/controls.h>
 #include <rclcpp/parameter_value.hpp>
+#include <stdexcept>
+#include <string>
+
+namespace libcamera
+{
+class ControlId;
+class ControlValue;
+} // namespace libcamera
 
 
 class invalid_conversion : public std::runtime_error

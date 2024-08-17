@@ -1,11 +1,11 @@
 #pragma once
-#include <libcamera/stream.h>
 #include <string>
 
 namespace libcamera
 {
 class PixelFormat;
-}
+class StreamFormats;
+} // namespace libcamera
 
 enum class FormatType
 {
