@@ -445,9 +445,17 @@ CameraNode::declareParameters()
       throw std::runtime_error("minimum and maximum parameter array sizes do not match");
 
     // check if the control can be mapped to a parameter
-    const rclcpp::ParameterType pv_type = cv_to_pv_type(id);
-    if (pv_type == rclcpp::ParameterType::PARAMETER_NOT_SET) {
-      RCLCPP_WARN_STREAM(get_logger(), "unsupported control '" << id->name() << "'");
+    rclcpp::ParameterType pv_type;
+    try {
+      pv_type = cv_to_pv_type(id);
+      if (pv_type == rclcpp::ParameterType::PARAMETER_NOT_SET) {
+        RCLCPP_WARN_STREAM(get_logger(), "unsupported control '" << id->name() << "'");
+        continue;
+      }
+    }
+    catch (const std::runtime_error &e) {
+      // ignore
+      RCLCPP_WARN_STREAM(get_logger(), e.what());
       continue;
     }
 
