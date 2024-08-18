@@ -154,6 +154,42 @@ get_role(const std::string &role)
   }
 }
 
+
+// The following function "compressImageMsg" is adapted from "CvImage::toCompressedImageMsg"
+// (https://github.com/ros-perception/vision_opencv/blob/066793a23e5d06d76c78ca3d69824a501c3554fd/cv_bridge/src/cv_bridge.cpp#L512-L535)
+// and covered by the BSD-3-Clause licence.
+void
+compressImageMsg(const sensor_msgs::msg::Image &source,
+                 sensor_msgs::msg::CompressedImage &destination,
+                 const std::vector<int> &params = std::vector<int>())
+{
+  std::shared_ptr<CameraNode> tracked_object;
+  cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(source, tracked_object);
+
+  destination.header = source.header;
+  cv::Mat image;
+  if (cv_ptr->encoding == enc::BGR8 || cv_ptr->encoding == enc::BGRA8 ||
+      cv_ptr->encoding == enc::MONO8 || cv_ptr->encoding == enc::MONO16)
+  {
+    image = cv_ptr->image;
+  }
+  else {
+    cv_bridge::CvImagePtr tempThis = std::make_shared<cv_bridge::CvImage>(*cv_ptr);
+    cv_bridge::CvImagePtr temp;
+    if (enc::hasAlpha(cv_ptr->encoding)) {
+      temp = cv_bridge::cvtColor(tempThis, enc::BGRA8);
+    }
+    else {
+      temp = cv_bridge::cvtColor(tempThis, enc::BGR8);
+    }
+    image = temp->image;
+  }
+
+  destination.format = "jpg";
+  cv::imencode(".jpg", image, destination.data, params);
+}
+
+
 CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options), cim(this)
 {
   // pixel format
@@ -548,40 +584,6 @@ CameraNode::declareParameters()
   for (const auto &[name, value] : parameters_init)
     parameters_init_list.emplace_back(name, value);
   set_parameters(parameters_init_list);
-}
-
-// The following function "compressImageMsg" is adapted from "CvImage::toCompressedImageMsg"
-// (https://github.com/ros-perception/vision_opencv/blob/066793a23e5d06d76c78ca3d69824a501c3554fd/cv_bridge/src/cv_bridge.cpp#L512-L535)
-// and covered by the BSD-3-Clause licence.
-void
-compressImageMsg(const sensor_msgs::msg::Image &source,
-                 sensor_msgs::msg::CompressedImage &destination,
-                 const std::vector<int> &params = std::vector<int>())
-{
-  std::shared_ptr<CameraNode> tracked_object;
-  cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(source, tracked_object);
-
-  destination.header = source.header;
-  cv::Mat image;
-  if (cv_ptr->encoding == enc::BGR8 || cv_ptr->encoding == enc::BGRA8 ||
-      cv_ptr->encoding == enc::MONO8 || cv_ptr->encoding == enc::MONO16)
-  {
-    image = cv_ptr->image;
-  }
-  else {
-    cv_bridge::CvImagePtr tempThis = std::make_shared<cv_bridge::CvImage>(*cv_ptr);
-    cv_bridge::CvImagePtr temp;
-    if (enc::hasAlpha(cv_ptr->encoding)) {
-      temp = cv_bridge::cvtColor(tempThis, enc::BGRA8);
-    }
-    else {
-      temp = cv_bridge::cvtColor(tempThis, enc::BGR8);
-    }
-    image = temp->image;
-  }
-
-  destination.format = "jpg";
-  cv::imencode(".jpg", image, destination.data, params);
 }
 
 void
