@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
 project(camera_ros)
-
 set(CMAKE_CXX_STANDARD 17)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -30,6 +29,7 @@ add_library(utils OBJECT
   src/types.cpp
   src/type_extent.cpp
 )
+
 target_include_directories(utils PUBLIC ${libcamera_INCLUDE_DIRS})
 ament_target_dependencies(
   utils
@@ -41,7 +41,6 @@ set_property(TARGET utils PROPERTY POSITION_INDEPENDENT_CODE ON)
 # composable ROS2 node
 add_library(camera_component SHARED src/CameraNode.cpp)
 rclcpp_components_register_node(camera_component PLUGIN "camera::CameraNode" EXECUTABLE "camera_node")
-
 target_include_directories(camera_component PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
@@ -53,12 +52,25 @@ ament_target_dependencies(
   "camera_info_manager"
   "cv_bridge"
 )
-
 target_include_directories(camera_component PUBLIC ${libcamera_INCLUDE_DIRS})
 target_link_libraries(camera_component ${libcamera_LINK_LIBRARIES} utils)
 
-install(TARGETS camera_component
-  DESTINATION lib)
+# Add the new stereonode
+add_executable(stereonode src/stereonode.cpp)
+ament_target_dependencies(stereonode
+  "rclcpp"
+  "sensor_msgs"
+  "cv_bridge"
+)
+target_link_libraries(stereonode ${OpenCV_LIBS})
+
+install(TARGETS
+  camera_component
+  stereonode
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
 
 install(DIRECTORY
   launch
