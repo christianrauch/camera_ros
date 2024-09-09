@@ -1,0 +1,57 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/ingaiza/stereo_cam/src/install/usb_cam/include/**",
+        "/home/ingaiza/imu_wit/install/wit_node/include/**",
+        "/home/ingaiza/imu_wit/install/wit_msgs/include/**",
+        "/home/ingaiza/imu_wit/install/wit_driver/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_streams/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_sigslots/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_ipc/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_devices/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_threads/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_mobile_robot/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_manipulators/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_geometry/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_containers/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_utilities/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_statistics/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_linear_algebra/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_math/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_formatters/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_converters/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_concepts/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_type_traits/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_time/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_time_lite/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_sigslots_lite/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_mpl/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_io/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_filesystem/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_exceptions/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_errors/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_converters_lite/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_console/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_config/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_command_line/include/**",
+        "/home/ingaiza/imu_wit/install/ecl_eigen/include/**",
+        "/home/ingaiza/turtle_ws/install/turtlebot3_gazebo/include/**",
+        "/home/ingaiza/turtle_ws/install/turtlebot3_fake_node/include/**",
+        "/home/ingaiza/level3_ws/install/my_robot_interfaces/include/**",
+        "/opt/ros/humble/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

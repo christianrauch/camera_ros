@@ -7,71 +7,108 @@
 class stereonode : public rclcpp::Node 
 {
 public:
-    stereonode() : Node("stereonode") 
+    stereonode() : Node("stereonode") , stop_thread_(false)
     {
-        stereo_subscription = this->create_subscription<sensor_msgs::msg::Image>("/camera/image_raw", 10, std::bind(&stereonode::stereo_callback, this, std::placeholders::_1));
+        stereo_subscription = this->create_subscription<sensor_msgs::msg::Image>("/camera/image_raw", 10, std::bind(&stereonode::image_callback, this, std::placeholders::_1));
         left_img_pub = this->create_publisher<sensor_msgs::msg::Image>("/stereo/left/image_raw", 10);
         right_img_pub = this->create_publisher<sensor_msgs::msg::Image>("/stereo/right/image_raw", 10);
         left_img_info = this->create_publisher<sensor_msgs::msg::CameraInfo>("/stereo/left/camera_info", 10);
         right_img_info = this->create_publisher<sensor_msgs::msg::CameraInfo>("/stereo/right/camera_info", 10);
 
+        processing_thread_ = std::thread(&stereonode::stereo_callback, this);
         RCLCPP_INFO(this->get_logger(), "Stereo publisher initializing");
     }
 
-private:
-    void stereo_callback(const sensor_msgs::msg::Image::SharedPtr msg)
+    ~stereonode()
     {
-        // Converting ROS Image message to cv format
-        cv_bridge::CvImagePtr cv_ptr;
-        try
-        {
-            cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+        stop_thread_ = true;
+        if (processing_thread_.joinable()) {
+            processing_thread_.join();
         }
-        catch (cv_bridge::Exception& e)
+    }
+
+private:
+ 
+    void image_callback(const sensor_msgs::msg::Image::SharedPtr msg)
+    {
+        //pushing image to the queue
+        std::lock_guard<std::mutex> lock(queue_mutex_);
+        image_queue_.push(msg);
+    }
+
+    void stereo_callback()
+    {
+        while (!stop_thread_)
         {
-            RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
-            return;
+            sensor_msgs::msg::Image::SharedPtr msg;
+            {
+                std::lock_guard<std::mutex> lock(queue_mutex_);
+                if (!image_queue_.empty())
+                {
+                    msg = image_queue_.front();
+                    image_queue_.pop();
+                }
+            }
+            if (msg)
+            {
+                // Converting ROS Image message to cv format
+                cv_bridge::CvImagePtr cv_ptr;
+                try
+                {
+                    cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+                }
+                catch (cv_bridge::Exception& e)
+                {
+                    RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
+                    continue;
+                }
+
+                // Getting the OpenCV image from the above operation
+                cv::Mat cv_image = cv_ptr->image;
+
+                // Checking if the image size is 2560x720
+                if (cv_image.cols != 2560 || cv_image.rows != 720)
+                {
+                    RCLCPP_ERROR(this->get_logger(), "Unexpected image size: %d x %d", cv_image.cols, cv_image.rows);
+                    continue;
+                }
+
+                // Splitting the image into left and right halves
+                cv::Mat left_image = cv_image(cv::Rect(0, 0, 1280, 720));   
+                cv::Mat right_image = cv_image(cv::Rect(1280, 0, 1280, 720)); 
+
+                // Convert the left image back to ROS Image message
+                cv_bridge::CvImage left_cv_image;
+                left_cv_image.header = msg->header; // Use the same timestamp and frame ID
+                left_cv_image.encoding = sensor_msgs::image_encodings::BGR8;
+                left_cv_image.image = left_image;
+                auto left_msg = left_cv_image.toImageMsg(); // Convert to ROS Image message
+
+                // Convert the right image back to ROS Image message
+                cv_bridge::CvImage right_cv_image;
+                right_cv_image.header = msg->header; // Use the same timestamp and frame ID
+                right_cv_image.encoding = sensor_msgs::image_encodings::BGR8;
+                right_cv_image.image = right_image;
+                auto right_msg = right_cv_image.toImageMsg(); // Convert to ROS Image message
+
+                // Publish the left and right images
+                left_img_pub->publish(*left_msg);
+                right_img_pub->publish(*right_msg);
+
+                // Create and publish CameraInfo messages for left and right cameras
+                auto left_camera_info = create_camera_info(msg->header, 1280, 720);
+                auto right_camera_info = create_camera_info(msg->header, 1280, 720);
+
+                // Publish the camera info
+                left_img_info->publish(left_camera_info);
+                right_img_info->publish(right_camera_info);
+            }
+            else
+            {
+                // No image to process, sleep for a short time
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
         }
-
-        // Getting the OpenCV image from the above operation
-        cv::Mat cv_image = cv_ptr->image;
-
-        // Checking if the image size is 2560x720
-        if (cv_image.cols != 2560 || cv_image.rows != 720)
-        {
-            RCLCPP_ERROR(this->get_logger(), "Unexpected image size: %d x %d", cv_image.cols, cv_image.rows);
-            return;
-        }
-
-        // Splitting the image into left and right halves
-        cv::Mat left_image = cv_image(cv::Rect(0, 0, 1280, 720));   
-        cv::Mat right_image = cv_image(cv::Rect(1280, 0, 1280, 720)); 
-
-        // Convert the left image back to ROS Image message
-        cv_bridge::CvImage left_cv_image;
-        left_cv_image.header = msg->header; // Use the same timestamp and frame ID
-        left_cv_image.encoding = sensor_msgs::image_encodings::BGR8;
-        left_cv_image.image = left_image;
-        auto left_msg = left_cv_image.toImageMsg(); // Convert to ROS Image message
-
-        // Convert the right image back to ROS Image message
-        cv_bridge::CvImage right_cv_image;
-        right_cv_image.header = msg->header; // Use the same timestamp and frame ID
-        right_cv_image.encoding = sensor_msgs::image_encodings::BGR8;
-        right_cv_image.image = right_image;
-        auto right_msg = right_cv_image.toImageMsg(); // Convert to ROS Image message
-
-        // Publish the left and right images
-        left_img_pub->publish(*left_msg);
-        right_img_pub->publish(*right_msg);
-
-        // Create and publish CameraInfo messages for left and right cameras
-        auto left_camera_info = create_camera_info(msg->header, 1280, 720);
-        auto right_camera_info = create_camera_info(msg->header, 1280, 720);
-
-        // Publish the camera info
-        left_img_info->publish(left_camera_info);
-        right_img_info->publish(right_camera_info);
     }
 
     sensor_msgs::msg::CameraInfo create_camera_info(const std_msgs::msg::Header& header, int width, int height)
@@ -103,6 +140,11 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr right_img_pub;
     rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr left_img_info;
     rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr right_img_info;
+    std::thread processing_thread_;
+    std::atomic<bool> stop_thread_;
+    std::queue<sensor_msgs::msg::Image::SharedPtr> image_queue_;
+    std::mutex queue_mutex_;
+
 };
 
 int main(int argc, char **argv)
