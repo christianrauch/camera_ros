@@ -6,7 +6,6 @@
 #include <libcamera/controls.h>
 #include <libcamera/geometry.h>
 #include <rclcpp/parameter_value.hpp>
-#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <vector>

@@ -7,7 +7,6 @@
 #include "type_extent.hpp"
 #include "types.hpp"
 #include <algorithm>
-#include <array>
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <cassert>
 #include <cctype>
@@ -19,6 +18,7 @@
 #elif __has_include(<cv_bridge/cv_bridge.h>)
 #include <cv_bridge/cv_bridge.h>
 #endif
+#include <atomic>
 #include <functional>
 #include <iostream>
 #include <libcamera/base/shared_fd.h>
@@ -34,16 +34,17 @@
 #include <libcamera/property_ids.h>
 #include <libcamera/request.h>
 #include <libcamera/stream.h>
-#include <map>
 #include <memory>
 #include <mutex>
+#include <opencv2/core/mat.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <optional>
 #include <rcl/context.h>
-#include <rcl_interfaces/msg/detail/floating_point_range__struct.hpp>
-#include <rcl_interfaces/msg/detail/integer_range__struct.hpp>
-#include <rcl_interfaces/msg/detail/parameter_descriptor__struct.hpp>
-#include <rcl_interfaces/msg/detail/set_parameters_result__struct.hpp>
+#include <rcl_interfaces/msg/floating_point_range.hpp>
+#include <rcl_interfaces/msg/integer_range.hpp>
+#include <rcl_interfaces/msg/parameter_descriptor.hpp>
+#include <rcl_interfaces/msg/parameter_type.hpp>
+#include <rcl_interfaces/msg/set_parameters_result.hpp>
 #include <rclcpp/logging.hpp>
 #include <rclcpp/node.hpp>
 #include <rclcpp/node_interfaces/node_parameters_interface.hpp>
@@ -53,15 +54,15 @@
 #include <rclcpp/time.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <sensor_msgs/image_encodings.hpp>
-#include <sensor_msgs/msg/detail/camera_info__struct.hpp>
-#include <sensor_msgs/msg/detail/compressed_image__struct.hpp>
-#include <sensor_msgs/msg/detail/image__struct.hpp>
-#include <std_msgs/msg/detail/header__struct.hpp>
+#include <sensor_msgs/msg/camera_info.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
+#include <sensor_msgs/msg/image.hpp>
+#include <std_msgs/msg/header.hpp>
 #include <stdexcept>
 #include <string>
 #include <sys/mman.h>
+#include <thread>
 #include <tuple>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -152,6 +153,42 @@ get_role(const std::string &role)
     throw std::runtime_error("invalid stream role: \"" + role + "\"");
   }
 }
+
+
+// The following function "compressImageMsg" is adapted from "CvImage::toCompressedImageMsg"
+// (https://github.com/ros-perception/vision_opencv/blob/066793a23e5d06d76c78ca3d69824a501c3554fd/cv_bridge/src/cv_bridge.cpp#L512-L535)
+// and covered by the BSD-3-Clause licence.
+void
+compressImageMsg(const sensor_msgs::msg::Image &source,
+                 sensor_msgs::msg::CompressedImage &destination,
+                 const std::vector<int> &params = std::vector<int>())
+{
+  std::shared_ptr<CameraNode> tracked_object;
+  cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(source, tracked_object);
+
+  destination.header = source.header;
+  cv::Mat image;
+  if (cv_ptr->encoding == enc::BGR8 || cv_ptr->encoding == enc::BGRA8 ||
+      cv_ptr->encoding == enc::MONO8 || cv_ptr->encoding == enc::MONO16)
+  {
+    image = cv_ptr->image;
+  }
+  else {
+    cv_bridge::CvImagePtr tempThis = std::make_shared<cv_bridge::CvImage>(*cv_ptr);
+    cv_bridge::CvImagePtr temp;
+    if (enc::hasAlpha(cv_ptr->encoding)) {
+      temp = cv_bridge::cvtColor(tempThis, enc::BGRA8);
+    }
+    else {
+      temp = cv_bridge::cvtColor(tempThis, enc::BGR8);
+    }
+    image = temp->image;
+  }
+
+  destination.format = "jpg";
+  cv::imencode(".jpg", image, destination.data, params);
+}
+
 
 CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options), cim(this)
 {
@@ -444,9 +481,17 @@ CameraNode::declareParameters()
       throw std::runtime_error("minimum and maximum parameter array sizes do not match");
 
     // check if the control can be mapped to a parameter
-    const rclcpp::ParameterType pv_type = cv_to_pv_type(id);
-    if (pv_type == rclcpp::ParameterType::PARAMETER_NOT_SET) {
-      RCLCPP_WARN_STREAM(get_logger(), "unsupported control '" << id->name() << "'");
+    rclcpp::ParameterType pv_type;
+    try {
+      pv_type = cv_to_pv_type(id);
+      if (pv_type == rclcpp::ParameterType::PARAMETER_NOT_SET) {
+        RCLCPP_WARN_STREAM(get_logger(), "unsupported control '" << id->name() << "'");
+        continue;
+      }
+    }
+    catch (const std::runtime_error &e) {
+      // ignore
+      RCLCPP_WARN_STREAM(get_logger(), e.what());
       continue;
     }
 
@@ -539,40 +584,6 @@ CameraNode::declareParameters()
   for (const auto &[name, value] : parameters_init)
     parameters_init_list.emplace_back(name, value);
   set_parameters(parameters_init_list);
-}
-
-// The following function "compressImageMsg" is adapted from "CvImage::toCompressedImageMsg"
-// (https://github.com/ros-perception/vision_opencv/blob/066793a23e5d06d76c78ca3d69824a501c3554fd/cv_bridge/src/cv_bridge.cpp#L512-L535)
-// and covered by the BSD-3-Clause licence.
-void
-compressImageMsg(const sensor_msgs::msg::Image &source,
-                 sensor_msgs::msg::CompressedImage &destination,
-                 const std::vector<int> &params = std::vector<int>())
-{
-  std::shared_ptr<CameraNode> tracked_object;
-  cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(source, tracked_object);
-
-  destination.header = source.header;
-  cv::Mat image;
-  if (cv_ptr->encoding == enc::BGR8 || cv_ptr->encoding == enc::BGRA8 ||
-      cv_ptr->encoding == enc::MONO8 || cv_ptr->encoding == enc::MONO16)
-  {
-    image = cv_ptr->image;
-  }
-  else {
-    cv_bridge::CvImagePtr tempThis = std::make_shared<cv_bridge::CvImage>(*cv_ptr);
-    cv_bridge::CvImagePtr temp;
-    if (enc::hasAlpha(cv_ptr->encoding)) {
-      temp = cv_bridge::cvtColor(tempThis, enc::BGRA8);
-    }
-    else {
-      temp = cv_bridge::cvtColor(tempThis, enc::BGR8);
-    }
-    image = temp->image;
-  }
-
-  destination.format = "jpg";
-  cv::imencode(".jpg", image, destination.data, params);
 }
 
 void
