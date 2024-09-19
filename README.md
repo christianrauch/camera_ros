@@ -159,3 +159,12 @@ and then run the node with libcamera and ROS debug information in `gdb`:
 ```sh
 LIBCAMERA_LOG_LEVELS=*:DEBUG ros2 run --prefix 'gdb -ex run --args' camera_ros camera_node --ros-args --log-level debug -p width:=640 -p height:=480
 ```
+
+
+### Q&A
+
+Q1: The node exits with `no cameras available`.
+> A1: Check your camera connection and test with the libcamera examples that the camera is supported and accessible.
+
+Q2: The node exits with `Failed to allocate buffers`.
+> A2: The requested image size and pixel format may be too large. Set `width` and `height` to a lower resolution or chose a compressed pixel format.
