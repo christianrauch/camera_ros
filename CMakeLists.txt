@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+  add_compile_options(-Wno-error=switch)
   add_link_options("-Wl,-z,relro,-z,now,-z,defs")
 endif()
 
