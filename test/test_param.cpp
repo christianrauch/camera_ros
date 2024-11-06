@@ -1,9 +1,10 @@
 #include "instantiate_component.hpp"
+#include "param_client.hpp"
 #include <gtest/gtest.h>
 #include <rclcpp/rclcpp.hpp>
 
 
-class Test : public testing::Test
+class ParamTest : public testing::Test
 {
 protected:
   void
@@ -13,10 +14,12 @@ protected:
 
     exec = rclcpp::executors::SingleThreadedExecutor::make_shared();
 
+    // common node options
     rclcpp::NodeOptions options;
     options.use_intra_process_comms(true);
 
     camera = instantiate_component("camera::CameraNode", options);
+    client = std::make_unique<ParamClient>(options, camera.get_node_base_interface()->get_name(), exec);
 
     exec->add_node(camera.get_node_base_interface());
   }
@@ -29,15 +32,15 @@ protected:
     rclcpp::shutdown();
   }
 
-private:
   rclcpp::Executor::SharedPtr exec;
   rclcpp_components::NodeInstanceWrapper camera;
+  std::unique_ptr<ParamClient> client;
 };
 
 
-TEST_F(Test, test)
+TEST_F(ParamTest, test)
 {
-  //
+  ASSERT_STREQ(client->get_node_base_interface()->get_name(), "param_client");
 }
 
 int
