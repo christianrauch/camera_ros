@@ -37,10 +37,11 @@ protected:
   std::unique_ptr<ParamClient> client;
 };
 
-
-TEST_F(ParamTest, test)
+TEST_F(ParamTest, any_param)
 {
-  ASSERT_STREQ(client->get_node_base_interface()->get_name(), "param_client");
+  // test that we have at least one node paramter
+  const std::vector<std::string> parameter_list = client->list_parameters();
+  ASSERT_FALSE(parameter_list.empty());
 }
 
 int
