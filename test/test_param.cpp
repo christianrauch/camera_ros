@@ -10,8 +10,6 @@ protected:
   void
   SetUp() override
   {
-    rclcpp::init(0, nullptr);
-
     exec = rclcpp::executors::SingleThreadedExecutor::make_shared();
 
     // common node options
@@ -28,8 +26,6 @@ protected:
   TearDown() override
   {
     exec->remove_node(camera.get_node_base_interface());
-
-    rclcpp::shutdown();
   }
 
   rclcpp::Executor::SharedPtr exec;
@@ -48,5 +44,8 @@ int
 main(int argc, char **argv)
 {
   testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
+  rclcpp::init(argc, argv);
+  const int rc = RUN_ALL_TESTS();
+  rclcpp::shutdown();
+  return rc;
 }
