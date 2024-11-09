@@ -20,6 +20,12 @@ public:
     return node->get_node_base_interface();
   }
 
+  std::vector<std::string>
+  list_parameters()
+  {
+    return client.list_parameters({}, {}).names;
+  }
+
 private:
   rclcpp::Node::SharedPtr node;
   rclcpp::SyncParametersClient client;
