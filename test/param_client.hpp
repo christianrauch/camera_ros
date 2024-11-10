@@ -26,6 +26,18 @@ public:
     return client.list_parameters({}, {}).names;
   }
 
+  bool
+  has_parameter(const std::string &parameter_name)
+  {
+    return client.has_parameter(parameter_name);
+  }
+
+  std::vector<rclcpp::Parameter>
+  get_parameters(const std::vector<std::string> &parameter_names)
+  {
+    return client.get_parameters(parameter_names);
+  }
+
 private:
   rclcpp::Node::SharedPtr node;
   rclcpp::SyncParametersClient client;
