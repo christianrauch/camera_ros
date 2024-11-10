@@ -1,5 +1,7 @@
 find_package(ament_cmake_gtest REQUIRED)
 
+find_package(rcl_interfaces REQUIRED)
+
 ament_add_gtest(${PROJECT_NAME}_test_param test_param.cpp)
 target_include_directories(${PROJECT_NAME}_test_param PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -8,6 +10,7 @@ target_include_directories(${PROJECT_NAME}_test_param PUBLIC
 ament_target_dependencies(${PROJECT_NAME}_test_param
     rclcpp
     rclcpp_components
+    rcl_interfaces
 )
 
 # link the 'camera_component' via '--no-as-needed' to find all plugins automatically via the ClassLoader
