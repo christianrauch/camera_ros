@@ -48,6 +48,18 @@ public:
     return client.get_parameters(parameter_names);
   }
 
+  std::vector<rcl_interfaces::msg::SetParametersResult>
+  set_parameters(const std::vector<rclcpp::Parameter> &parameters)
+  {
+    return client.set_parameters(parameters);
+  }
+
+  rcl_interfaces::msg::SetParametersResult
+  set_parameters_atomically(const std::vector<rclcpp::Parameter> &parameters)
+  {
+    return client.set_parameters_atomically(parameters);
+  }
+
 private:
   rclcpp::Node::SharedPtr node;
   rclcpp::SyncParametersClient client;
