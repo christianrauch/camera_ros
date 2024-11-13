@@ -2,6 +2,7 @@
 #include "log_client.hpp"
 #include "param_client.hpp"
 #include <gtest/gtest.h>
+#include <libcamera/camera_manager.h>
 #include <rclcpp/rclcpp.hpp>
 
 
@@ -11,6 +12,14 @@ protected:
   void
   SetUp() override
   {
+    {
+      // skip tests when no camera is available
+      libcamera::CameraManager camera_manager;
+      camera_manager.start();
+      if (camera_manager.cameras().empty())
+        GTEST_SKIP() << "No cameras available. Skipping tests." << std::endl;
+    }
+
     rclcpp::get_logger(CAMERA_NODE_NAME).set_level(rclcpp::Logger::Level::Debug);
 
     exec = rclcpp::executors::SingleThreadedExecutor::make_shared();
@@ -25,8 +34,10 @@ protected:
   void
   TearDown() override
   {
-    exec->remove_node(camera.get_node_base_interface());
-    exec->remove_node(log_client->get_node_base_interface());
+    if (exec) {
+      exec->remove_node(camera.get_node_base_interface());
+      exec->remove_node(log_client->get_node_base_interface());
+    }
   }
 
   void
@@ -39,6 +50,10 @@ protected:
   void
   instantiate_camera(const std::vector<rclcpp::Parameter> &parameter_overrides)
   {
+    if (!exec) {
+      FAIL() << "Executor is not initialised";
+    }
+
     camera = instantiate_component(
       "camera::CameraNode",
       rclcpp::NodeOptions {}
