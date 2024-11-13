@@ -66,6 +66,8 @@ protected:
 
   const std::string CAMERA_NODE_NAME = "camera";
 
+  const std::string conflict_reason = "AeEnable and ExposureTime must not be set simultaneously";
+
   rclcpp::Executor::SharedPtr exec;
   rclcpp_components::NodeInstanceWrapper camera;
   std::unique_ptr<ParamClient> param_client;
@@ -179,6 +181,156 @@ TEST_F(ParamTest, override_ae_enabled_exposure)
   ASSERT_EQ(param_client->get_parameters({"ExposureTime"}).front().as_int(), 15600);
 }
 
+TEST_F(ParamTest, override_default_set_exposure)
+{
+  instantiate_camera({});
+
+  ASSERT_TRUE(param_client->is_set_parameter("AeEnable"));
+  ASSERT_TRUE(param_client->is_set_parameter("ExposureTime"));
+
+  // by default, auto exposure is active
+  ASSERT_EQ(param_client->get_parameters({"AeEnable"}).front().as_bool(), true);
+
+  const int exp_init = param_client->get_parameters({"ExposureTime"}).front().as_int();
+
+  // setting 'ExposureTime' with 'AeEnable' enabled by default causes conflict
+  const int exp_tar1 = exp_init + 100;
+  const std::vector<rcl_interfaces::msg::SetParametersResult> res_exposure =
+    param_client->set_parameters({{"ExposureTime", exp_tar1}});
+  ASSERT_FALSE(res_exposure[0].successful);
+  ASSERT_EQ(res_exposure[0].reason, "AeEnable and ExposureTime must not be set simultaneously");
+  // parameter updates are not applied
+  ASSERT_NE(param_client->get_parameters({"ExposureTime"}).front().as_int(), exp_tar1);
+}
+
+TEST_F(ParamTest, override_ae_disabled_set_exposure)
+{
+  // disable 'AeEnable'
+  instantiate_camera({{"AeEnable", false}});
+
+  ASSERT_TRUE(param_client->is_set_parameter("AeEnable"));
+  ASSERT_TRUE(param_client->is_set_parameter("ExposureTime"));
+
+  // 'AeEnable' takes the override value
+  ASSERT_EQ(param_client->get_parameters({"AeEnable"}).front().as_bool(), false);
+
+  const int exp_init = param_client->get_parameters({"ExposureTime"}).front().as_int();
+
+  // setting 'ExposureTime' does not cause conflict and is applied
+  const int exp_tar1 = exp_init + 100;
+  const std::vector<rcl_interfaces::msg::SetParametersResult> res_exposure =
+    param_client->set_parameters({{"ExposureTime", exp_tar1}});
+  ASSERT_TRUE(res_exposure[0].successful);
+  ASSERT_EQ(res_exposure[0].reason, std::string {});
+  // parameter updates are applied
+  ASSERT_EQ(param_client->get_parameters({"ExposureTime"}).front().as_int(), exp_tar1);
+}
+
+TEST_F(ParamTest, override_ae_disabled_set_atom_ae_enabled_exposure)
+{
+  // disable 'AeEnable'
+  instantiate_camera({{"AeEnable", false}});
+
+  ASSERT_TRUE(param_client->is_set_parameter("AeEnable"));
+  ASSERT_TRUE(param_client->is_set_parameter("ExposureTime"));
+
+  const int exp_init = param_client->get_parameters({"ExposureTime"}).front().as_int();
+
+  // setting 'AeEnable' and 'ExposureTime' at once will fail
+  // no parameter updates are applied
+  const std::vector<rclcpp::Parameter> initial_param_vals =
+    param_client->get_parameters({"AeEnable", "ExposureTime"});
+  const int exp_tar1 = exp_init + 100;
+  const rcl_interfaces::msg::SetParametersResult res_atom =
+    param_client->set_parameters_atomically({{"AeEnable", true}, {"ExposureTime", exp_tar1}});
+  ASSERT_FALSE(res_atom.successful);
+  ASSERT_EQ(res_atom.reason, conflict_reason);
+  // parameters do not change
+  ASSERT_EQ(initial_param_vals, param_client->get_parameters({"AeEnable", "ExposureTime"}));
+}
+
+TEST_F(ParamTest, override_ae_disabled_set_atom_exposure_ae_enabled)
+{
+  // disable 'AeEnable'
+  instantiate_camera({{"AeEnable", false}});
+
+  ASSERT_TRUE(param_client->is_set_parameter("AeEnable"));
+  ASSERT_TRUE(param_client->is_set_parameter("ExposureTime"));
+
+  const int exp_init = param_client->get_parameters({"ExposureTime"}).front().as_int();
+
+  // setting 'ExposureTime' and 'AeEnable' at once will fail
+  // no parameter updates are applied
+  const std::vector<rclcpp::Parameter> initial_param_vals =
+    param_client->get_parameters({"AeEnable", "ExposureTime"});
+  const int exp_tar1 = exp_init + 100;
+  const rcl_interfaces::msg::SetParametersResult res_atom =
+    param_client->set_parameters_atomically({{"ExposureTime", exp_tar1}, {"AeEnable", true}});
+  ASSERT_FALSE(res_atom.successful);
+  ASSERT_EQ(res_atom.reason, conflict_reason);
+  // parameters do not change
+  ASSERT_EQ(initial_param_vals, param_client->get_parameters({"AeEnable", "ExposureTime"}));
+}
+
+TEST_F(ParamTest, override_ae_disabled_set_indiv_ae_enabled_exposure)
+{
+  // disable 'AeEnable'
+  instantiate_camera({{"AeEnable", false}});
+
+  ASSERT_TRUE(param_client->is_set_parameter("AeEnable"));
+  ASSERT_TRUE(param_client->is_set_parameter("ExposureTime"));
+
+  const int exp_init = param_client->get_parameters({"ExposureTime"}).front().as_int();
+
+  // setting 'AeEnable' and 'ExposureTime' individually one-by-one will fail evenetually
+  const int exp_tar1 = exp_init + 100;
+  const std::vector<rcl_interfaces::msg::SetParametersResult> res_indiv =
+    param_client->set_parameters({{"AeEnable", true}, {"ExposureTime", exp_tar1}});
+  // first parameter 'AeEnable' does not cause conflicts
+  ASSERT_TRUE(res_indiv[0].successful);
+  ASSERT_EQ(res_indiv[0].reason, std::string {});
+  // second parameter 'ExposureTime' causes conflict with previous 'AeEnable'
+  ASSERT_FALSE(res_indiv[1].successful);
+  ASSERT_EQ(res_indiv[1].reason, conflict_reason);
+  // only the parameter update for 'AeEnable' will have been applied
+  ASSERT_EQ(param_client->get_parameters({"AeEnable"}).front().as_bool(), true);
+  ASSERT_EQ(param_client->get_parameters({"ExposureTime"}).front().as_int(), exp_init);
+  ASSERT_NE(param_client->get_parameters({"ExposureTime"}).front().as_int(), exp_tar1);
+
+  // setting 'ExposureTime' again will fail since 'AeEnable' has already been applied
+  const int exp_tar2 = exp_init + 200;
+  const std::vector<rcl_interfaces::msg::SetParametersResult> res_exposure =
+    param_client->set_parameters({{"ExposureTime", exp_tar2}});
+  ASSERT_FALSE(res_exposure[0].successful);
+  ASSERT_EQ(res_exposure[0].reason, conflict_reason);
+  ASSERT_EQ(param_client->get_parameters({"ExposureTime"}).front().as_int(), exp_init);
+  ASSERT_NE(param_client->get_parameters({"ExposureTime"}).front().as_int(), exp_tar2);
+}
+
+TEST_F(ParamTest, override_ae_disabled_set_indiv_exposure_ae_enabled)
+{
+  // disable 'AeEnable'
+  instantiate_camera({{"AeEnable", false}});
+
+  ASSERT_TRUE(param_client->is_set_parameter("AeEnable"));
+  ASSERT_TRUE(param_client->is_set_parameter("ExposureTime"));
+
+  const int exp_init = param_client->get_parameters({"ExposureTime"}).front().as_int();
+
+  // setting 'ExposureTime' and 'AeEnable' individually one-by-one will fail evenetually
+  const int exp_tar1 = exp_init + 100;
+  const std::vector<rcl_interfaces::msg::SetParametersResult> res_indiv =
+    param_client->set_parameters({{"ExposureTime", exp_tar1}, {"AeEnable", true}});
+  // first parameter 'ExposureTime' does not cause conflicts
+  ASSERT_TRUE(res_indiv[0].successful);
+  ASSERT_EQ(res_indiv[0].reason, std::string {});
+  // second parameter 'AeEnable' takes precedence over previous 'ExposureTime'
+  ASSERT_TRUE(res_indiv[1].successful);
+  ASSERT_EQ(res_indiv[1].reason, std::string {});
+  // both parameters will have been updated, but only 'AeEnable' will be effective
+  ASSERT_EQ(param_client->get_parameters({"ExposureTime"}).front().as_int(), exp_tar1);
+  ASSERT_EQ(param_client->get_parameters({"AeEnable"}).front().as_bool(), true);
+}
 
 int
 main(int argc, char **argv)
