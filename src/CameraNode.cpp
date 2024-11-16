@@ -26,7 +26,7 @@
 #include <libcamera/base/span.h>
 #include <libcamera/camera.h>
 #include <libcamera/camera_manager.h>
-#include <libcamera/controls.h>
+#include <libcamera/control_ids.h>
 #include <libcamera/framebuffer.h>
 #include <libcamera/framebuffer_allocator.h>
 #include <libcamera/geometry.h>
@@ -677,9 +677,15 @@ CameraNode::process(libcamera::Request *const request)
 
     // update parameters
     parameters_lock.lock();
-    for (const auto &[id, value] : parameters)
-      request->controls().set(id, value);
-    parameters.clear();
+    if (!parameters.empty()) {
+      RCLCPP_DEBUG_STREAM(get_logger(), request->toString() << " setting " << parameters.size() << " controls");
+      for (const auto &[id, value] : parameters) {
+        const std::string &name = libcamera::controls::controls.at(id)->name();
+        RCLCPP_DEBUG_STREAM(get_logger(), "apply " << name << ": " << value.toString());
+        request->controls().set(id, value);
+      }
+      parameters.clear();
+    }
     parameters_lock.unlock();
 
     camera->queueRequest(request);
