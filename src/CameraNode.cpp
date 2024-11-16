@@ -579,7 +579,10 @@ CameraNode::declareParameters()
   std::vector<rclcpp::Parameter> parameters_init_list;
   for (const auto &[name, value] : parameters_init)
     parameters_init_list.emplace_back(name, value);
-  set_parameters(parameters_init_list);
+  const rcl_interfaces::msg::SetParametersResult param_set_result =
+    set_parameters_atomically(parameters_init_list);
+  if (!param_set_result.successful)
+    RCLCPP_ERROR_STREAM(get_logger(), "Cannot declare parameters with default value: " << param_set_result.reason);
 }
 
 void
