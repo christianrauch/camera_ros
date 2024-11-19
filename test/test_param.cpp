@@ -67,6 +67,8 @@ protected:
   const std::string CAMERA_NODE_NAME = "camera";
 
   const std::string conflict_reason = "AeEnable and ExposureTime must not be set simultaneously";
+  const std::string declare_AeEnable = "declare 'AeEnable' \\(type: bool\\)";
+  const std::string declare_ExposureTime = "declare 'ExposureTime' \\(type: integer\\)";
 
   rclcpp::Executor::SharedPtr exec;
   rclcpp_components::NodeInstanceWrapper camera;
@@ -82,8 +84,8 @@ TEST_F(ParamTest, override_default)
   spin_all();
 
   // expect: declare 'AeEnable' and 'ExposureTime'
-  ASSERT_TRUE(log_client->regex_search("declare AeEnable with default true"));
-  ASSERT_TRUE(log_client->regex_search("declare ExposureTime with default (.*)"));
+  ASSERT_TRUE(log_client->regex_search(declare_AeEnable));
+  ASSERT_TRUE(log_client->regex_search(declare_ExposureTime));
 
   // expect: only 'AeEnable' is set
   ASSERT_TRUE(log_client->regex_search("setting bool parameter AeEnable to true"));
@@ -105,8 +107,8 @@ TEST_F(ParamTest, override_ae_disabled)
   spin_all();
 
   // expect: declare 'AeEnable' and 'ExposureTime'
-  ASSERT_TRUE(log_client->regex_search("declare AeEnable with default true"));
-  ASSERT_TRUE(log_client->regex_search("declare ExposureTime with default (.*)"));
+  ASSERT_TRUE(log_client->regex_search(declare_AeEnable));
+  ASSERT_TRUE(log_client->regex_search(declare_ExposureTime));
 
   // expect: only 'AeEnable' is set to override value
   ASSERT_TRUE(log_client->regex_search("setting bool parameter AeEnable to false"));
@@ -123,8 +125,8 @@ TEST_F(ParamTest, override_exposure)
   spin_all();
 
   // expect: declare 'AeEnable' and 'ExposureTime'
-  ASSERT_TRUE(log_client->regex_search("declare AeEnable with default true"));
-  ASSERT_TRUE(log_client->regex_search("declare ExposureTime with default (.*)"));
+  ASSERT_TRUE(log_client->regex_search(declare_AeEnable));
+  ASSERT_TRUE(log_client->regex_search(declare_ExposureTime));
 
   // expect: 'AeEnable' adjusted to 'false'
   // expect: 'ExposureTime' set to override value
@@ -144,8 +146,8 @@ TEST_F(ParamTest, override_ae_disabled_exposure)
   spin_all();
 
   // expect: declare 'AeEnable' and 'ExposureTime'
-  ASSERT_TRUE(log_client->regex_search("declare AeEnable with default true"));
-  ASSERT_TRUE(log_client->regex_search("declare ExposureTime with default (.*)"));
+  ASSERT_TRUE(log_client->regex_search(declare_AeEnable));
+  ASSERT_TRUE(log_client->regex_search(declare_ExposureTime));
 
   // expect: 'AeEnable' and 'ExposureTime' are set
   ASSERT_TRUE(log_client->regex_search("setting bool parameter AeEnable to false"));
@@ -164,8 +166,8 @@ TEST_F(ParamTest, override_ae_enabled_exposure)
   spin_all();
 
   // expect: declare 'AeEnable' and 'ExposureTime'
-  ASSERT_TRUE(log_client->regex_search("declare AeEnable with default true"));
-  ASSERT_TRUE(log_client->regex_search("declare ExposureTime with default (.*)"));
+  ASSERT_TRUE(log_client->regex_search(declare_AeEnable));
+  ASSERT_TRUE(log_client->regex_search(declare_ExposureTime));
 
   // expect: 'ExposureTime' override with default 'AeEnable' shows warning
   ASSERT_TRUE(log_client->regex_search("AeEnable and ExposureTime must not be enabled at the same time. 'AeEnable' will be set to off."));
