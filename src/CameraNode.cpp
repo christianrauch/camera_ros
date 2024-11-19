@@ -66,7 +66,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-namespace enc = sensor_msgs::image_encodings;
+
 namespace rclcpp
 {
 class NodeOptions;
@@ -163,6 +163,8 @@ compressImageMsg(const sensor_msgs::msg::Image &source,
                  sensor_msgs::msg::CompressedImage &destination,
                  const std::vector<int> &params = std::vector<int>())
 {
+  namespace enc = sensor_msgs::image_encodings;
+
   std::shared_ptr<CameraNode> tracked_object;
   cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(source, tracked_object);
 
