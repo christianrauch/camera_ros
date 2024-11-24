@@ -26,7 +26,7 @@
 #include <libcamera/base/span.h>
 #include <libcamera/camera.h>
 #include <libcamera/camera_manager.h>
-#include <libcamera/controls.h>
+#include <libcamera/control_ids.h>
 #include <libcamera/framebuffer.h>
 #include <libcamera/framebuffer_allocator.h>
 #include <libcamera/geometry.h>
@@ -364,10 +364,6 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   RCLCPP_INFO_STREAM(get_logger(), "camera \"" << camera->id() << "\" configured with "
                                                << scfg.toString() << " stream");
 
-  set_parameter(rclcpp::Parameter("width", int64_t(scfg.size.width)));
-  set_parameter(rclcpp::Parameter("height", int64_t(scfg.size.height)));
-  set_parameter(rclcpp::Parameter("format", scfg.pixelFormat.toString()));
-
   // format camera name for calibration file
   const libcamera::ControlList &props = camera->properties();
   std::string cname = camera->id() + '_' + scfg.size.toString();
@@ -426,10 +422,10 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   }
 
   // create a processing thread per request
+  running = true;
   for (const std::unique_ptr<libcamera::Request> &request : requests) {
     request_locks[request.get()] = std::make_unique<std::mutex>();
     request_locks[request.get()]->lock();
-    running = true;
     request_threads.emplace_back(&CameraNode::process, this, request.get());
   }
 
@@ -583,7 +579,10 @@ CameraNode::declareParameters()
   std::vector<rclcpp::Parameter> parameters_init_list;
   for (const auto &[name, value] : parameters_init)
     parameters_init_list.emplace_back(name, value);
-  set_parameters(parameters_init_list);
+  const rcl_interfaces::msg::SetParametersResult param_set_result =
+    set_parameters_atomically(parameters_init_list);
+  if (!param_set_result.successful)
+    RCLCPP_ERROR_STREAM(get_logger(), "Cannot declare parameters with default value: " << param_set_result.reason);
 }
 
 void
@@ -678,9 +677,15 @@ CameraNode::process(libcamera::Request *const request)
 
     // update parameters
     parameters_lock.lock();
-    for (const auto &[id, value] : parameters)
-      request->controls().set(id, value);
-    parameters.clear();
+    if (!parameters.empty()) {
+      RCLCPP_DEBUG_STREAM(get_logger(), request->toString() << " setting " << parameters.size() << " controls");
+      for (const auto &[id, value] : parameters) {
+        const std::string &name = libcamera::controls::controls.at(id)->name();
+        RCLCPP_DEBUG_STREAM(get_logger(), "apply " << name << ": " << value.toString());
+        request->controls().set(id, value);
+      }
+      parameters.clear();
+    }
     parameters_lock.unlock();
 
     camera->queueRequest(request);

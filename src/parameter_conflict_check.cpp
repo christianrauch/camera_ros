@@ -21,8 +21,11 @@ resolve_conflicts(const ParameterMap &parameters_default, const ParameterMap &pa
   }
 
   // apply parameter overrides
-  for (const auto &[name, value] : parameters_overrides)
-    parameters_init[name] = value;
+  for (const auto &[name, value] : parameters_overrides) {
+    // only override parameters that have matching controls
+    if (parameters_default.count(name))
+      parameters_init[name] = value;
+  }
 
   // overrides: prefer provided exposure
   if (parameters_init.count("AeEnable") && parameters_init.at("AeEnable").get<bool>() &&
