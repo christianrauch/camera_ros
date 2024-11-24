@@ -413,6 +413,8 @@ ParameterHandler::get()
 {
   const std::lock_guard<std::mutex> lock(parameters_lock);
   // TODO: final check of conflicts for gathered controls?
+  // if (!control_values.empty())
+  parameters_consumed_lock.unlock();
   return control_values;
 }
 
@@ -547,13 +549,29 @@ ParameterHandler::apply(const std::vector<rclcpp::Parameter> &parameters)
   // NOTE: apply could be called multiple times before 'control_values' is read,
   // should we clear 'control_values' on every apply to keep previous checks valid?
 
+  // filter
+  std::vector<rclcpp::Parameter> controls;
+  for (const rclcpp::Parameter &parameter : parameters) {
+    if (parameter_ids.count(parameter.get_name()))
+      controls.push_back(parameter);
+  }
+
+  if (controls.empty())
+    return;
+
   // TODO: use a callback to set controls immediately on request
+
+  // wait for previous controls to be consumed
+  std::cout << "wait parameters_consumed_lock ..." << std::endl;
+  parameters_consumed_lock.lock();
 
   parameters_lock.lock();
   // control_values.clear(); // need this??
-  for (const rclcpp::Parameter &parameter : parameters) {
-    if (!parameter_ids.count(parameter.get_name()))
-      continue;
+  RCLCPP_DEBUG_STREAM(node->get_logger(), "apply " << controls.size() << " parameters");
+  for (const rclcpp::Parameter &parameter : controls) {
+    // RCLCPP_DEBUG_STREAM(node->get_logger(), "apply " << parameter.get_name());
+    // if (!parameter_ids.count(parameter.get_name()))
+    //   continue;
     const libcamera::ControlId *id = parameter_ids.at(parameter.get_name());
     const libcamera::ControlValue value = pv_to_cv(parameter, id->type());
     // control_values[parameter_ids.at(parameter.get_name())->id()] = value;
