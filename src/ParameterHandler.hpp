@@ -54,6 +54,7 @@ private:
   // ControlValueMap control_values;
   libcamera::ControlList control_values;
   std::mutex parameters_lock;
+  std::mutex parameters_consumed_lock;
 
   void
   adjust(std::vector<rclcpp::Parameter> &parameters);

@@ -582,6 +582,7 @@ CameraNode::process(libcamera::Request *const request)
     // update parameters
     request->controls() = parameter_handler.get();
     parameter_handler.clear();
+    RCLCPP_DEBUG_STREAM(get_logger(), "applied " << request->controls().size() << " controls");
     for (const auto &[id, value] : request->controls()) {
       const std::string &name = libcamera::controls::controls.at(id)->name();
       RCLCPP_DEBUG_STREAM(get_logger(), "applied " << name << ": " << value.toString());
