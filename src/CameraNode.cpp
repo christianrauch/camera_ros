@@ -19,7 +19,6 @@
 #include <cv_bridge/cv_bridge.h>
 #endif
 #include <atomic>
-#include <functional>
 #include <iostream>
 #include <libcamera/base/shared_fd.h>
 #include <libcamera/base/signal.h>
@@ -62,7 +61,6 @@
 #include <string>
 #include <sys/mman.h>
 #include <thread>
-#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
