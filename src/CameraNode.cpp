@@ -87,7 +87,8 @@ private:
   std::shared_ptr<libcamera::FrameBufferAllocator> allocator;
   std::vector<std::unique_ptr<libcamera::Request>> requests;
   std::vector<std::thread> request_threads;
-  std::unordered_map<libcamera::Request *, std::unique_ptr<std::mutex>> request_locks;
+  std::unordered_map<const libcamera::Request *, std::mutex> request_mutexes;
+  std::unordered_map<const libcamera::Request *, std::condition_variable> request_condvars;
   std::atomic<bool> running;
 
   struct buffer_info_t
@@ -424,8 +425,9 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   // create a processing thread per request
   running = true;
   for (const std::unique_ptr<libcamera::Request> &request : requests) {
-    request_locks[request.get()] = std::make_unique<std::mutex>();
-    request_locks[request.get()]->lock();
+    // create mutexes in-place
+    request_mutexes[request.get()];
+    request_condvars[request.get()];
     request_threads.emplace_back(&CameraNode::process, this, request.get());
   }
 
@@ -446,8 +448,18 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
 CameraNode::~CameraNode()
 {
+  // stop request callbacks
+  for (std::unique_ptr<libcamera::Request> &request : requests)
+    camera->requestCompleted.disconnect(request.get());
+
   // stop request processing threads
   running = false;
+
+  // unlock all threads
+  for (auto &[req, condvar] : request_condvars)
+    condvar.notify_all();
+
+  // wait for all currently running threads to finish
   for (std::thread &thread : request_threads)
     thread.join();
 
@@ -588,15 +600,20 @@ CameraNode::declareParameters()
 void
 CameraNode::requestComplete(libcamera::Request *const request)
 {
-  request_locks[request]->unlock();
+  std::unique_lock lk(request_mutexes.at(request));
+  request_condvars.at(request).notify_one();
 }
 
 void
 CameraNode::process(libcamera::Request *const request)
 {
-  while (running) {
+  while (true) {
     // block until request is available
-    request_locks[request]->lock();
+    std::unique_lock lk(request_mutexes.at(request));
+    request_condvars.at(request).wait(lk);
+
+    if (!running)
+      return;
 
     if (request->status() == libcamera::Request::RequestComplete) {
       assert(request->buffers().size() == 1);
