@@ -115,7 +115,8 @@ private:
   std::unordered_map<unsigned int, libcamera::ControlValue> parameters;
   // keep track of set parameters
   ParameterMap parameters_full;
-  std::mutex parameters_lock;
+  std::mutex parameters_mutex;
+  std::unique_lock<std::mutex> parameters_lock {parameters_mutex, std::defer_lock};
   // compression quality parameter
   std::atomic_uint8_t jpeg_quality;
 
