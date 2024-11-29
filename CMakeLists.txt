@@ -43,9 +43,6 @@ set_property(TARGET utils PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(camera_component SHARED src/CameraNode.cpp)
 rclcpp_components_register_node(camera_component PLUGIN "camera::CameraNode" EXECUTABLE "camera_node")
 
-target_include_directories(camera_component PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(
   camera_component
   "rclcpp"
