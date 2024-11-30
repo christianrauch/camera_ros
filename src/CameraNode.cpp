@@ -128,6 +128,9 @@ private:
   rcl_interfaces::msg::SetParametersResult
   onParameterChange(const std::vector<rclcpp::Parameter> &parameters);
 #endif
+
+  void
+  apply_parameters(const libcamera::ControlList &controls);
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(camera::CameraNode)
@@ -391,6 +394,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     throw std::runtime_error("camera name must only contain alphanumeric characters");
 
   parameter_handler.declare(camera->controls());
+  parameter_handler.set_on_apply_callback(
+    std::bind(&CameraNode::apply_parameters, this, std::placeholders::_1));
 
   // allocate stream buffers and create one request per buffer
   stream = scfg.stream();
@@ -579,14 +584,14 @@ CameraNode::process(libcamera::Request *const request)
     // queue the request again for the next frame
     request->reuse(libcamera::Request::ReuseBuffers);
 
-    // update parameters
-    request->controls() = parameter_handler.get();
-    parameter_handler.clear();
-    RCLCPP_DEBUG_STREAM(get_logger(), "applied " << request->controls().size() << " controls");
-    for (const auto &[id, value] : request->controls()) {
-      const std::string &name = libcamera::controls::controls.at(id)->name();
-      RCLCPP_DEBUG_STREAM(get_logger(), "applied " << name << ": " << value.toString());
-    }
+    // // update parameters
+    // request->controls() = parameter_handler.get();
+    // // parameter_handler.clear();
+    // RCLCPP_DEBUG_STREAM(get_logger(), "applied " << request->controls().size() << " controls");
+    // for (const auto &[id, value] : request->controls()) {
+    //   const std::string &name = libcamera::controls::controls.at(id)->name();
+    //   RCLCPP_DEBUG_STREAM(get_logger(), "applied " << name << ": " << value.toString());
+    // }
 
     // const auto parameters = parameter_handler.get();
     // if (!parameters.empty()) {
@@ -629,5 +634,21 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
   return result;
 }
 #endif
+
+void
+CameraNode::apply_parameters(const libcamera::ControlList &controls)
+{
+  for (const std::unique_ptr<libcamera::Request> &request : requests) {
+    std::unique_lock lk(request_mutexes.at(request.get()));
+    // update parameters
+    request->controls() = controls;
+    // parameter_handler.clear();
+    RCLCPP_DEBUG_STREAM(get_logger(), "applied " << request->controls().size() << " controls");
+    for (const auto &[id, value] : request->controls()) {
+      const std::string &name = libcamera::controls::controls.at(id)->name();
+      RCLCPP_DEBUG_STREAM(get_logger(), "control applied " << name << ": " << value.toString());
+    }
+  }
+}
 
 } // namespace camera

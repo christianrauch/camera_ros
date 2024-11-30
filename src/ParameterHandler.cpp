@@ -414,16 +414,22 @@ ParameterHandler::get()
   const std::lock_guard<std::mutex> lock(parameters_lock);
   // TODO: final check of conflicts for gathered controls?
   // if (!control_values.empty())
-  parameters_consumed_lock.unlock();
+  // parameters_consumed_lock.unlock();
   return control_values;
 }
 
+// void
+// ParameterHandler::clear()
+// {
+//   parameters_lock.lock();
+//   control_values.clear();
+//   parameters_lock.unlock();
+// }
+
 void
-ParameterHandler::clear()
+ParameterHandler::set_on_apply_callback(std::function<void(const libcamera::ControlList &)> callback)
 {
-  parameters_lock.lock();
-  control_values.clear();
-  parameters_lock.unlock();
+  on_apply_callback = callback;
 }
 
 void
@@ -562,8 +568,8 @@ ParameterHandler::apply(const std::vector<rclcpp::Parameter> &parameters)
   // TODO: use a callback to set controls immediately on request
 
   // wait for previous controls to be consumed
-  std::cout << "wait parameters_consumed_lock ..." << std::endl;
-  parameters_consumed_lock.lock();
+  // std::cout << "wait parameters_consumed_lock ..." << std::endl;
+  // parameters_consumed_lock.lock();
 
   parameters_lock.lock();
   // control_values.clear(); // need this??
@@ -576,10 +582,21 @@ ParameterHandler::apply(const std::vector<rclcpp::Parameter> &parameters)
     const libcamera::ControlValue value = pv_to_cv(parameter, id->type());
     // control_values[parameter_ids.at(parameter.get_name())->id()] = value;
     // const std::string &name = libcamera::controls::controls.at(id)->name();
-    RCLCPP_DEBUG_STREAM(node->get_logger(), "apply " << id->name() << ": " << value.toString());
+    RCLCPP_DEBUG_STREAM(node->get_logger(), "param apply " << id->name() << ": " << value.toString());
     control_values.set(parameter_ids[parameter.get_name()]->id(), value);
     // TODO: What if 'control_values' gets conflcit here? Should we gather this before?
   }
+
+  if (on_apply_callback)
+    on_apply_callback(control_values);
+
+  control_values.clear();
+
+  // if (on_apply_callback)
+  //   on_apply_callback(control_values);
+  // else
+  //   RCLCPP_ERROR(node->get_logger(), "parameter apply callback not set");
+
   parameters_lock.unlock();
 }
 

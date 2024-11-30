@@ -1,5 +1,6 @@
 #pragma once
 #include "parameter_conflict_check.hpp"
+#include <functional>
 #include <libcamera/controls.h>
 #include <mutex>
 #include <rclcpp/node_interfaces/node_parameters_interface.hpp>
@@ -7,6 +8,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <vector>
+
 
 namespace rclcpp
 {
@@ -28,8 +30,11 @@ public:
   libcamera::ControlList &
   get();
 
+  // void
+  // clear();
+
   void
-  clear();
+  set_on_apply_callback(std::function<void(const libcamera::ControlList &)> callback);
 
   // std::tuple<ControlValueMap, std::vector<std::string>>
   // parameterCheckAndConvert(const std::vector<rclcpp::Parameter> &parameters);
@@ -54,7 +59,9 @@ private:
   // ControlValueMap control_values;
   libcamera::ControlList control_values;
   std::mutex parameters_lock;
-  std::mutex parameters_consumed_lock;
+  // std::mutex parameters_consumed_lock;
+  // std::condition_variable cv;
+  std::function<void(const libcamera::ControlList &)> on_apply_callback;
 
   void
   adjust(std::vector<rclcpp::Parameter> &parameters);
