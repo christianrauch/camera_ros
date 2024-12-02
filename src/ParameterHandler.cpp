@@ -7,6 +7,7 @@
 #include "types.hpp"
 #include <cstddef>
 #include <libcamera/base/span.h>
+#include <libcamera/control_ids.h>
 #include <libcamera/controls.h>
 #include <rcl_interfaces/msg/floating_point_range.hpp>
 #include <rcl_interfaces/msg/integer_range.hpp>
@@ -28,9 +29,9 @@
 // 1. resolve conflicts, warn user
 // 2. apply
 
-typedef std::unordered_map<std::string, rclcpp::ParameterValue> ParamValueMap;
+// typedef std::unordered_map<std::string, rclcpp::ParameterValue> ParamValueMap;
 
-// typedef std::unordered_map<std::string, rclcpp::Parameter &> ParameterView;
+typedef std::unordered_map<std::string, rclcpp::Parameter &> ParameterView;
 typedef std::unordered_map<std::string, const rclcpp::Parameter &> ParameterViewConst;
 
 // ParameterView
@@ -46,19 +47,21 @@ typedef std::unordered_map<std::string, const rclcpp::Parameter &> ParameterView
 
 // std::vector<rclcpp::Parameter &>
 // param_view(std::unordered_map<std::string, rclcpp::ParameterValue> &parameters)
-// {
-//   // create a mapping of parameter names to references of that parameter
-//   // ParameterView param_map;
-//   // for (rclcpp::Parameter &parameter : parameters) {
-//   //   param_map.insert({parameter.get_name(), parameter});
-//   // }
-//   // return param_map;
+ParameterView
+param_view(std::vector<rclcpp::Parameter> &parameters)
+{
+  // create a mapping of parameter names to references of that parameter
+  ParameterView param_map;
+  for (rclcpp::Parameter &parameter : parameters) {
+    param_map.insert({parameter.get_name(), parameter});
+  }
+  return param_map;
 
-//   for (auto &[name, value] : parameters) {
-//     if (overrides.count(name))
-//       value = overrides.at(name);
-//   }
-// }
+  // for (auto &[name, value] : parameters) {
+  //   if (overrides.count(name))
+  //     value = overrides.at(name);
+  // }
+}
 
 ParameterViewConst
 param_view(const std::vector<rclcpp::Parameter> &parameters)
@@ -89,7 +92,7 @@ format_result(const std::vector<std::string> &msgs)
 }
 
 bool
-conflict_exposure(const ParamValueMap &p)
+ParameterHandler::conflict_exposure(const ParamValueMap &p)
 {
   // auto exposure must not be enabled while fixed exposure time is set
   return p.count("AeEnable") && p.at("AeEnable").get<bool>() &&
@@ -97,13 +100,14 @@ conflict_exposure(const ParamValueMap &p)
 }
 
 std::vector<std::string>
-resolve_defaults(ParamValueMap &p)
+ParameterHandler::resolve_defaults(ParameterHandler::ParamValueMap &p)
 {
   std::vector<std::string> msgs;
 
   // default: prefer auto exposure
   if (conflict_exposure(p)) {
     // disable exposure
+    disabled_restore["ExposureTime"] = p.at("ExposureTime");
     p.at("ExposureTime") = {};
     msgs.emplace_back("AeEnable and ExposureTime must not be enabled at the same time. 'ExposureTime' will be disabled.");
   }
@@ -111,7 +115,7 @@ resolve_defaults(ParamValueMap &p)
 }
 
 std::vector<std::string>
-resolve_overrides(ParamValueMap &p)
+ParameterHandler::resolve_overrides(ParamValueMap &p)
 {
   std::vector<std::string> msgs;
 
@@ -120,6 +124,11 @@ resolve_overrides(ParamValueMap &p)
     // disable auto exposure
     p.at("AeEnable") = rclcpp::ParameterValue {false};
     msgs.emplace_back("AeEnable and ExposureTime must not be enabled at the same time. 'AeEnable' will be set to off.");
+  }
+  // restore 'ExposureTime'
+  if (p.count("AeEnable") && !p.at("AeEnable").get<bool>()) {
+    p.at("ExposureTime") = disabled_restore.at("ExposureTime");
+    disabled_restore.erase("ExposureTime");
   }
   return msgs;
 }
@@ -159,6 +168,23 @@ check(const std::vector<rclcpp::Parameter> &parameters_old,
     msgs.emplace_back("AeEnable and ExposureTime must not be set simultaneously");
 
   return msgs;
+}
+
+void
+restore(std::vector<rclcpp::Parameter> &parameters,
+        std::unordered_map<std::string, rclcpp::ParameterValue> &disabled_restore)
+{
+  ParameterView p = param_view(parameters);
+
+  // restore 'ExposureTime' when 'AeEnable' is off
+  if (p.count("AeEnable") && !p.at("AeEnable").as_bool()) {
+    // p.at("ExposureTime") = {"ExposureTime", disabled_restore.at("ExposureTime")};
+    // NOTE: adding to ParameterView does not add to vector
+    if (disabled_restore.count("ExposureTime")) {
+      parameters.push_back({"ExposureTime", disabled_restore.at("ExposureTime")});
+      disabled_restore.erase("ExposureTime");
+    }
+  }
 }
 
 ParameterHandler::ParameterHandler(rclcpp::Node *const node)
@@ -436,10 +462,11 @@ void
 ParameterHandler::adjust(std::vector<rclcpp::Parameter> &parameters)
 {
   //
-  (void)parameters;
+  // (void)parameters;
   // for (const rclcpp::Parameter &parameter : parameters) {
   //   //
   // }
+  restore(parameters, disabled_restore);
 }
 
 std::vector<std::string>

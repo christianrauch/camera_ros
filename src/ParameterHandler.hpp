@@ -40,6 +40,8 @@ public:
   // parameterCheckAndConvert(const std::vector<rclcpp::Parameter> &parameters);
 
 private:
+  typedef std::unordered_map<std::string, rclcpp::ParameterValue> ParamValueMap;
+
   rclcpp::Node *const node;
 
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_cb_on;
@@ -55,6 +57,7 @@ private:
   std::unordered_map<std::string, libcamera::ControlInfo> parameter_info;
   // keep track of set parameters
   // ParameterMap parameters_full;
+  ParamValueMap disabled_restore;
 
   // ControlValueMap control_values;
   libcamera::ControlList control_values;
@@ -62,6 +65,15 @@ private:
   // std::mutex parameters_consumed_lock;
   // std::condition_variable cv;
   std::function<void(const libcamera::ControlList &)> on_apply_callback;
+
+  bool
+  conflict_exposure(const ParamValueMap &p);
+
+  std::vector<std::string>
+  resolve_defaults(ParamValueMap &p);
+
+  std::vector<std::string>
+  resolve_overrides(ParamValueMap &p);
 
   void
   adjust(std::vector<rclcpp::Parameter> &parameters);
