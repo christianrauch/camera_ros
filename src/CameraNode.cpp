@@ -571,8 +571,8 @@ CameraNode::declareParameters()
     }
     else {
       declare_parameter(id->name(), value, param_descr);
-      parameters_init[id->name()] = value;
     }
+    parameters_init[id->name()] = value;
   }
 
   // register callback to handle parameter changes
