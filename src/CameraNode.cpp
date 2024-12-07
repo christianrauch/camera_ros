@@ -590,8 +590,10 @@ CameraNode::declareParameters()
     RCLCPP_WARN_STREAM(get_logger(), s);
 
   std::vector<rclcpp::Parameter> parameters_init_list;
-  for (const auto &[name, value] : parameters_init)
-    parameters_init_list.emplace_back(name, value);
+  for (const auto &[name, value] : parameters_init) {
+    if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET)
+      parameters_init_list.emplace_back(name, value);
+  }
   const rcl_interfaces::msg::SetParametersResult param_set_result =
     set_parameters_atomically(parameters_init_list);
   if (!param_set_result.successful)
