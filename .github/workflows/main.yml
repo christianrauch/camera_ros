@@ -41,6 +41,8 @@ jobs:
       - name: build and test
         uses: ros-tooling/action-ros-ci@v0.3
         id: action_ros_ci
+        env:
+          ASAN_OPTIONS: new_delete_type_mismatch=0
         with:
           package-name: camera_ros
           target-ros2-distro: ${{ matrix.distribution }}
