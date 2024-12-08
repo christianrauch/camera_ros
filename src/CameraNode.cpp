@@ -19,7 +19,6 @@
 #include <cv_bridge/cv_bridge.h>
 #endif
 #include <atomic>
-#include <functional>
 #include <iostream>
 #include <libcamera/base/shared_fd.h>
 #include <libcamera/base/signal.h>
@@ -62,11 +61,10 @@
 #include <string>
 #include <sys/mman.h>
 #include <thread>
-#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-namespace enc = sensor_msgs::image_encodings;
+
 namespace rclcpp
 {
 class NodeOptions;
@@ -89,7 +87,8 @@ private:
   std::shared_ptr<libcamera::FrameBufferAllocator> allocator;
   std::vector<std::unique_ptr<libcamera::Request>> requests;
   std::vector<std::thread> request_threads;
-  std::unordered_map<libcamera::Request *, std::unique_ptr<std::mutex>> request_locks;
+  std::unordered_map<const libcamera::Request *, std::mutex> request_mutexes;
+  std::unordered_map<const libcamera::Request *, std::condition_variable> request_condvars;
   std::atomic<bool> running;
 
   struct buffer_info_t
@@ -116,7 +115,8 @@ private:
   std::unordered_map<unsigned int, libcamera::ControlValue> parameters;
   // keep track of set parameters
   ParameterMap parameters_full;
-  std::mutex parameters_lock;
+  std::mutex parameters_mutex;
+  std::unique_lock<std::mutex> parameters_lock {parameters_mutex, std::defer_lock};
   // compression quality parameter
   std::atomic_uint8_t jpeg_quality;
 
@@ -163,6 +163,8 @@ compressImageMsg(const sensor_msgs::msg::Image &source,
                  sensor_msgs::msg::CompressedImage &destination,
                  const std::vector<int> &params = std::vector<int>())
 {
+  namespace enc = sensor_msgs::image_encodings;
+
   std::shared_ptr<CameraNode> tracked_object;
   cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(source, tracked_object);
 
@@ -424,8 +426,9 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   // create a processing thread per request
   running = true;
   for (const std::unique_ptr<libcamera::Request> &request : requests) {
-    request_locks[request.get()] = std::make_unique<std::mutex>();
-    request_locks[request.get()]->lock();
+    // create mutexes in-place
+    request_mutexes[request.get()];
+    request_condvars[request.get()];
     request_threads.emplace_back(&CameraNode::process, this, request.get());
   }
 
@@ -446,8 +449,18 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
 CameraNode::~CameraNode()
 {
+  // stop request callbacks
+  for (std::unique_ptr<libcamera::Request> &request : requests)
+    camera->requestCompleted.disconnect(request.get());
+
   // stop request processing threads
   running = false;
+
+  // unlock all threads
+  for (auto &[req, condvar] : request_condvars)
+    condvar.notify_all();
+
+  // wait for all currently running threads to finish
   for (std::thread &thread : request_threads)
     thread.join();
 
@@ -558,8 +571,8 @@ CameraNode::declareParameters()
     }
     else {
       declare_parameter(id->name(), value, param_descr);
-      parameters_init[id->name()] = value;
     }
+    parameters_init[id->name()] = value;
   }
 
   // register callback to handle parameter changes
@@ -577,8 +590,10 @@ CameraNode::declareParameters()
     RCLCPP_WARN_STREAM(get_logger(), s);
 
   std::vector<rclcpp::Parameter> parameters_init_list;
-  for (const auto &[name, value] : parameters_init)
-    parameters_init_list.emplace_back(name, value);
+  for (const auto &[name, value] : parameters_init) {
+    if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET)
+      parameters_init_list.emplace_back(name, value);
+  }
   const rcl_interfaces::msg::SetParametersResult param_set_result =
     set_parameters_atomically(parameters_init_list);
   if (!param_set_result.successful)
@@ -588,15 +603,20 @@ CameraNode::declareParameters()
 void
 CameraNode::requestComplete(libcamera::Request *const request)
 {
-  request_locks[request]->unlock();
+  std::unique_lock lk(request_mutexes.at(request));
+  request_condvars.at(request).notify_one();
 }
 
 void
 CameraNode::process(libcamera::Request *const request)
 {
-  while (running) {
+  while (true) {
     // block until request is available
-    request_locks[request]->lock();
+    std::unique_lock lk(request_mutexes.at(request));
+    request_condvars.at(request).wait(lk);
+
+    if (!running)
+      return;
 
     if (request->status() == libcamera::Request::RequestComplete) {
       assert(request->buffers().size() == 1);

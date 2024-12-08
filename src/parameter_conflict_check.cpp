@@ -13,7 +13,9 @@ resolve_conflicts(const ParameterMap &parameters_default, const ParameterMap &pa
   // must not be enabled at the same time
 
   // default: prefer auto exposure
-  if (parameters_init.count("AeEnable") && parameters_init.at("AeEnable").get<bool>() &&
+  if (parameters_init.count("AeEnable") &&
+      (parameters_init.at("AeEnable").get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET) &&
+      parameters_init.at("AeEnable").get<bool>() &&
       parameters_init.count("ExposureTime"))
   {
     // disable exposure
@@ -28,7 +30,9 @@ resolve_conflicts(const ParameterMap &parameters_default, const ParameterMap &pa
   }
 
   // overrides: prefer provided exposure
-  if (parameters_init.count("AeEnable") && parameters_init.at("AeEnable").get<bool>() &&
+  if (parameters_init.count("AeEnable") &&
+      (parameters_init.at("AeEnable").get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET) &&
+      parameters_init.at("AeEnable").get<bool>() &&
       parameters_init.count("ExposureTime"))
   {
     // disable auto exposure
@@ -56,7 +60,9 @@ check_conflicts(const std::vector<rclcpp::Parameter> &parameters_new,
 
   // is auto exposure going to be enabled?
   const bool ae_enabled =
-    parameter_map.count("AeEnable") && parameter_map.at("AeEnable").get<bool>();
+    parameter_map.count("AeEnable") &&
+    (parameter_map.at("AeEnable").get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET) &&
+    parameter_map.at("AeEnable").get<bool>();
   // are new parameters setting the exposure manually?
   const bool exposure_updated =
     std::find_if(parameters_new.begin(), parameters_new.end(), [](const rclcpp::Parameter &param) {
