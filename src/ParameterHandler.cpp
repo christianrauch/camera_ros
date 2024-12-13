@@ -160,7 +160,7 @@ check(const std::vector<rclcpp::Parameter> &parameters_old,
   // are new parameters setting the exposure manually?
   const bool exposure_updated =
     std::find_if(parameters_new.begin(), parameters_new.end(), [](const rclcpp::Parameter &param) {
-      return param.get_name() == "ExposureTime";
+      return (param.get_name() == "ExposureTime") && (param.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET);
     }) != parameters_new.end();
 
   // ExposureTime must not be set while AeEnable is true
@@ -184,6 +184,14 @@ restore(std::vector<rclcpp::Parameter> &parameters,
       parameters.push_back({"ExposureTime", disabled_restore.at("ExposureTime")});
       disabled_restore.erase("ExposureTime");
     }
+  }
+  // NOTE: if validation fails, we cannot revert this
+  // TODO: this should go somewhere else
+  if (p.count("AeEnable") && p.at("AeEnable").as_bool()) {
+    // NOTE: We cannot "unset" the parameter as this will cause
+    // "cannot undeclare a statically typed parameter"
+    parameters.push_back({"ExposureTime", {}});
+    // parameters.push_back({"ExposureTime", rclcpp::ParameterValue {0}});
   }
 }
 
@@ -248,6 +256,12 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
   std::unordered_map<std::string, rclcpp::ParameterValue> parameters;
   // std::vector<rcl_interfaces::msg::ParameterDescriptor> descriptors;
 
+  // All "control" parameters are declared as dynamically typed in order to be able
+  // to unset them (set their type to 'rclcpp::ParameterType::PARAMETER_NOT_SET').
+  // Unsetting a statically typed parameter causes "cannot undeclare a statically typed parameter".
+
+  // TODO: store and check types manually
+
   // convert camera controls to parameters
   for (const auto &[id, info] : controls) {
     // store control id with name
@@ -278,6 +292,7 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.name = id->name();
     descriptor.type = pv_type;
+    descriptor.dynamic_typing = true;
     try {
       const std::size_t extent = get_extent(id);
       const bool scalar = (extent == 0);
@@ -349,9 +364,12 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
       continue;
     }
 
-    // declare parameters without default values and overrides to avoid triggering the callbacks already
+    // declare parameters without default values, types and overrides to avoid triggering the callbacks already
+    // parameters have to be dynamically typed in order to unset them at runtime
     RCLCPP_DEBUG_STREAM(node->get_logger(), "declare '" << id->name() << "' (type: " << pv_type << ")");
-    node->declare_parameter(id->name(), pv_type, descriptor, true);
+    // node->declare_parameter(id->name(), pv_type, descriptor, true);
+    // node->declare_parameter(id->name(), rclcpp::ParameterType::PARAMETER_NOT_SET, descriptor, true);
+    node->declare_parameter(id->name(), rclcpp::ParameterValue {}, descriptor, true);
   }
 
   // TODO: merge default parameters and overrides and resolve conflicts
@@ -502,6 +520,8 @@ ParameterHandler::validate(const std::vector<rclcpp::Parameter> &parameters)
   //   node->get_parameter(name, );
   // }
   // const std::vector<rclcpp::Parameter> parameters_old = node->get_parameters(parameter_names_old);
+
+  // TODO: store ExposureTime here if AeEnable, then disable?
 
   // conflicts
   const std::vector<std::string> msgs = check(parameters_old, parameters);
