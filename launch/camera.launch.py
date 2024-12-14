@@ -1,3 +1,5 @@
+from ament_index_python.resources import has_resource
+
 from launch.actions import DeclareLaunchArgument
 from launch.launch_description import LaunchDescription
 from launch.substitutions import LaunchConfiguration
@@ -40,31 +42,40 @@ def generate_launch_description() -> LaunchDescription:
         description="pixel format"
     )
 
-    # composable nodes in single container
-    container = ComposableNodeContainer(
-        name='camera_container',
-        namespace='',
-        package='rclcpp_components',
-        executable='component_container',
-        composable_node_descriptions=[
-            ComposableNode(
-                package='camera_ros',
-                plugin='camera::CameraNode',
-                parameters=[{
-                    "camera": camera_param,
-                    "width": 640,
-                    "height": 480,
-                    "format": format_param,
-                }],
-                extra_arguments=[{'use_intra_process_comms': True}],
-            ),
+    # camera node
+    composable_nodes = [
+        ComposableNode(
+            package='camera_ros',
+            plugin='camera::CameraNode',
+            parameters=[{
+                "camera": camera_param,
+                "width": 640,
+                "height": 480,
+                "format": format_param,
+            }],
+            extra_arguments=[{'use_intra_process_comms': True}],
+        ),
+
+    ]
+
+    # optionally add ImageViewNode to show camera image
+    if has_resource("packages", "image_view"):
+        composable_nodes += [
             ComposableNode(
                 package='image_view',
                 plugin='image_view::ImageViewNode',
                 remappings=[('/image', '/camera/image_raw')],
                 extra_arguments=[{'use_intra_process_comms': True}],
             ),
-        ],
+        ]
+
+    # composable nodes in single container
+    container = ComposableNodeContainer(
+        name='camera_container',
+        namespace='',
+        package='rclcpp_components',
+        executable='component_container',
+        composable_node_descriptions=composable_nodes,
     )
 
     return LaunchDescription([
