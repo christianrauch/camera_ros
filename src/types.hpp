@@ -25,12 +25,12 @@ to_string(const libcamera::ControlType id);
 template<libcamera::ControlType>
 struct ControlTypeMap;
 
-MAP(void, None);
-MAP(bool, Bool);
-MAP(uint8_t, Byte);
-MAP(int32_t, Integer32);
-MAP(int64_t, Integer64);
-MAP(float, Float);
-MAP(std::string, String);
-MAP(libcamera::Rectangle, Rectangle);
-MAP(libcamera::Size, Size);
+MAP(void, None)
+MAP(bool, Bool)
+MAP(uint8_t, Byte)
+MAP(int32_t, Integer32)
+MAP(int64_t, Integer64)
+MAP(float, Float)
+MAP(std::string, String)
+MAP(libcamera::Rectangle, Rectangle)
+MAP(libcamera::Size, Size)
