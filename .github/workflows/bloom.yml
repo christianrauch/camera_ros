@@ -1,0 +1,73 @@
+name: bloom
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: "${{ matrix.distro }} (${{ matrix.ros_distribution }})"
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu
+            version: 22.04
+            ros_distribution: humble
+
+          - distro: ubuntu
+            version: 24.04
+            ros_distribution: jazzy
+
+          - distro: almalinux
+            version: 8
+            ros_distribution: humble
+
+          - distro: almalinux
+            version: 9
+            ros_distribution: jazzy
+
+    container:
+      image: ${{ matrix.distro }}:${{ matrix.version }}
+
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      PIP_BREAK_SYSTEM_PACKAGES: 1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ros-tooling/setup-ros@v0.7
+
+      - name: install build tool dependencies (ubuntu)
+        if: ${{ matrix.distro == 'ubuntu' }}
+        run: |
+          apt install -y --no-install-recommends devscripts equivs
+
+      - name: install build tool dependencies (almalinux)
+        if: ${{ matrix.distro == 'almalinux' }}
+        run: |
+          dnf install -y python3-mypy clang-tools-extra
+
+      - name: install bloom
+        run: pip3 install -U git+https://github.com/ros-infrastructure/bloom.git
+
+      - name: bloom (ubuntu)
+        if: ${{ matrix.distro == 'ubuntu' }}
+        run: |
+          rosdep update
+          bloom-generate rosdebian --ros-distro ${{ matrix.ros_distribution }}
+          mk-build-deps
+          apt install -y --no-install-recommends ./ros-${{ matrix.ros_distribution }}-camera-ros-build-deps_*_all.deb
+          dpkg-buildpackage -b
+          apt install -y --no-install-recommends ../ros-${{ matrix.ros_distribution }}-camera-ros_*.deb ../ros-${{ matrix.ros_distribution }}-camera-ros-dbgsym_*.ddeb
+
+      - name: bloom (almalinux)
+        if: ${{ matrix.distro == 'almalinux'}}
+        run: |
+          rosdep update
+          bloom-generate rosrpm --ros-distro ${{ matrix.ros_distribution }}
+          dnf builddep -y rpm/template.spec
+          rpmbuild -bb --build-in-place rpm/template.spec
+          dnf install -y /github/home/rpmbuild/RPMS/*/ros-${{ matrix.ros_distribution }}-camera-ros-*.rpm
