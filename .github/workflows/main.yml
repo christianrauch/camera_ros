@@ -1,4 +1,4 @@
-name: camera_ros build
+name: colcon
 
 on:
   pull_request:
@@ -7,32 +7,45 @@ on:
 
 jobs:
   build:
-    name: camera_ros (${{ matrix.distribution }})
+    name: "${{ matrix.distribution }} (${{ matrix.ros }})"
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
         include:
-          - version: 22.04
-            distribution: humble
-          - version: 24.04
-            distribution: jazzy
-    continue-on-error: ${{ matrix.distribution == 'rolling' }}
+          - distribution: ubuntu
+            version: 22.04
+            ros: humble
+
+          - distribution: ubuntu
+            version: 24.04
+            ros: jazzy
+
+          - distribution: almalinux
+            version: 9
+            ros: jazzy
+
+    continue-on-error: ${{ matrix.ros == 'rolling' }}
 
     container:
-      image: ubuntu:${{ matrix.version }}
+      image: ${{ matrix.distribution }}:${{ matrix.version }}
       env:
         PIP_BREAK_SYSTEM_PACKAGES: 1
 
     steps:
-      - name: install ROS2 ${{ matrix.distribution }}
+      - name: install ROS 2
         uses: ros-tooling/setup-ros@v0.7
+
+      - name: build and test dependencies (almalinux)
+        if: ${{ matrix.distribution == 'almalinux'}}
+        run: |
+          dnf -y install libasan python3-mypy
 
       - name: build and test
         uses: ros-tooling/action-ros-ci@v0.3
         with:
           package-name: camera_ros
-          target-ros2-distro: ${{ matrix.distribution }}
+          target-ros2-distro: ${{ matrix.ros }}
           colcon-defaults: |
             {
               "build": {
