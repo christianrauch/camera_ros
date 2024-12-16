@@ -1,6 +1,7 @@
 name: colcon
 
 on:
+  push:
   pull_request:
     paths-ignore:
       - "README.md"
@@ -11,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - distribution: ubuntu
