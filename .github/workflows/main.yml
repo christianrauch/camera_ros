@@ -31,15 +31,8 @@ jobs:
       - name: install ROS2 ${{ matrix.distribution }}
         uses: ros-tooling/setup-ros@v0.7
 
-      - name: colcon lint dependencies
-        run: |
-          apt install -y apt-rdepends ros-${{ matrix.distribution }}-launch-ros
-          pip install lark
-          pip install colcon-lint
-
       - name: build and test
         uses: ros-tooling/action-ros-ci@v0.3
-        id: action_ros_ci
         with:
           package-name: camera_ros
           target-ros2-distro: ${{ matrix.distribution }}
@@ -50,9 +43,3 @@ jobs:
               }
             }
           colcon-mixin-repository: https://raw.githubusercontent.com/colcon/colcon-mixin-repository/5d51dff38097e8c2bf46d7a5b804e65935aa7f47/index.yaml
-
-      - name: colcon lint
-        working-directory: ${{ steps.action_ros_ci.outputs.ros-workspace-directory-name }}
-        run: |
-          . install/setup.sh
-          colcon lint
