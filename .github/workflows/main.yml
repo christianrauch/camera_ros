@@ -1,4 +1,4 @@
-name: camera_ros build
+name: colcon
 
 on:
   pull_request:
@@ -7,34 +7,46 @@ on:
 
 jobs:
   build:
-    name: camera_ros (${{ matrix.distribution }})
+    name: "${{ matrix.distribution }} (${{ matrix.ros }})"
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
         include:
-          - version: 22.04
-            distribution: humble
-          - version: 24.04
-            distribution: jazzy
-    continue-on-error: ${{ matrix.distribution == 'rolling' }}
+          - distribution: ubuntu
+            version: 22.04
+            ros: humble
+
+          - distribution: ubuntu
+            version: 24.04
+            ros: jazzy
+
+          - distribution: almalinux
+            version: 8
+            ros: humble
+
+          - distribution: almalinux
+            version: 9
+            ros: jazzy
+
+    continue-on-error: ${{ matrix.ros == 'rolling' }}
 
     container:
-      image: ubuntu:${{ matrix.version }}
+      image: ${{ matrix.distribution }}:${{ matrix.version }}
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        PIP_BREAK_SYSTEM_PACKAGES: 1
 
     steps:
       - name: fetch source
         uses: actions/checkout@v4
 
-      - name: install ROS2 ${{ matrix.distribution }}
+      - name: install ROS 2
         uses: ros-tooling/setup-ros@v0.7
 
       - name: colcon lint dependencies
         run: |
-          apt install -y python3-venv
-          apt install -y apt-rdepends ros-${{ matrix.distribution }}-launch-ros
-          python3 -m venv ~/.venvs/dev
-          . ~/.venvs/dev/bin/activate
+          # apt install -y apt-rdepends ros-${{ matrix.ros }}-launch-ros
           pip install lark
           pip install colcon-lint
 
@@ -43,7 +55,7 @@ jobs:
         id: action_ros_ci
         with:
           package-name: camera_ros
-          target-ros2-distro: ${{ matrix.distribution }}
+          target-ros2-distro: ${{ matrix.ros }}
           colcon-defaults: |
             {
               "build": {
@@ -55,6 +67,4 @@ jobs:
       - name: colcon lint
         working-directory: ${{ steps.action_ros_ci.outputs.ros-workspace-directory-name }}
         run: |
-          . install/setup.sh
-          . ~/.venvs/dev/bin/activate
           colcon lint
