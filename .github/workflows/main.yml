@@ -59,6 +59,19 @@ jobs:
 
       - name: build and test
         uses: ros-tooling/action-ros-ci@v0.3
+        if: ${{ matrix.distribution == 'ubuntu' }}
         with:
           package-name: camera_ros
           target-ros2-distro: ${{ matrix.ros }}
+
+      - name: build and test (almalinux)
+        if: ${{ matrix.distribution == 'almalinux' }}
+        run: |
+          rosdep update
+          mkdir -p ~/camera_ws/src
+          cd ~/camera_ws/src
+          git clone ${GITHUB_SERVER_URL}/${{ github.repository }} -b ${GITHUB_REF_NAME}
+          cd ~/camera_ws
+          rosdep install --from-paths src --ignore-src -y --rosdistro humble
+          . /opt/ros/humble/setup.bash
+          colcon build
