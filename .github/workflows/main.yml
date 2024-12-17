@@ -25,9 +25,6 @@ jobs:
         PIP_BREAK_SYSTEM_PACKAGES: 1
 
     steps:
-      - name: fetch source
-        uses: actions/checkout@v4
-
       - name: install ROS2 ${{ matrix.distribution }}
         uses: ros-tooling/setup-ros@v0.7
 
