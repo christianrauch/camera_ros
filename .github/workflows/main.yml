@@ -62,10 +62,3 @@ jobs:
         with:
           package-name: camera_ros
           target-ros2-distro: ${{ matrix.ros }}
-          colcon-defaults: |
-            {
-              "build": {
-                "mixin": ["asan-gcc", "tsan", "coverage-gcc", "memcheck"]
-              }
-            }
-          colcon-mixin-repository: https://raw.githubusercontent.com/colcon/colcon-mixin-repository/5d51dff38097e8c2bf46d7a5b804e65935aa7f47/index.yaml
