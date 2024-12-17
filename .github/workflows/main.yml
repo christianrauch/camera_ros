@@ -74,4 +74,4 @@ jobs:
           cd ~/camera_ws
           rosdep install --from-paths src --ignore-src -y --rosdistro humble
           . /opt/ros/humble/setup.bash
-          colcon build
+          colcon build --packages-up-to camera_ros --event-handlers=console_cohesion+ --symlink-install
