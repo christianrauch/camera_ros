@@ -35,25 +35,25 @@ extract_value(const libcamera::ControlValue &value)
 
 template<
   typename T,
-  std::enable_if_t<std::is_arithmetic<T>::value || std::is_same<std::string, T>::value, bool> = true>
+  std::enable_if_t<std::is_constructible<rclcpp::ParameterValue, std::vector<T>>::value, bool> = true>
 rclcpp::ParameterValue
 cv_to_pv_array(const std::vector<T> &values)
 {
   return rclcpp::ParameterValue(values);
 }
 
-template<typename T,
-         std::enable_if_t<!std::is_arithmetic<T>::value && !std::is_same<std::string, T>::value,
-                          bool> = true>
+template<
+  typename T,
+  std::enable_if_t<!std::is_constructible<rclcpp::ParameterValue, std::vector<T>>::value, bool> = true>
 rclcpp::ParameterValue
 cv_to_pv_array(const std::vector<T> & /*values*/)
 {
-  throw invalid_conversion("ParameterValue only supported for arithmetic types");
+  throw invalid_conversion("ParameterValue not constructible from complex type.");
 }
 
 template<
   typename T,
-  std::enable_if_t<std::is_arithmetic<T>::value || std::is_same<std::string, T>::value, bool> = true>
+  std::enable_if_t<std::is_constructible<rclcpp::ParameterValue, T>::value, bool> = true>
 rclcpp::ParameterValue
 cv_to_pv_scalar(const T &value)
 {
