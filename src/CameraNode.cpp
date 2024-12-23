@@ -70,6 +70,12 @@ namespace rclcpp
 class NodeOptions;
 }
 
+#define CASE_RANGE(T, R)                                       \
+  case libcamera::ControlType##T:                              \
+    R.from_value = max<libcamera::ControlType##T>(info.min()); \
+    R.to_value = min<libcamera::ControlType##T>(info.max());   \
+    break;
+
 
 namespace camera
 {
@@ -528,18 +534,13 @@ CameraNode::declareParameters()
     rcl_interfaces::msg::FloatingPointRange range_float;
 
     switch (id->type()) {
-    case libcamera::ControlTypeInteger32:
-      range_int.from_value = max<libcamera::ControlTypeInteger32>(info.min());
-      range_int.to_value = min<libcamera::ControlTypeInteger32>(info.max());
-      break;
-    case libcamera::ControlTypeInteger64:
-      range_int.from_value = max<libcamera::ControlTypeInteger64>(info.min());
-      range_int.to_value = min<libcamera::ControlTypeInteger64>(info.max());
-      break;
-    case libcamera::ControlTypeFloat:
-      range_float.from_value = max<libcamera::ControlTypeFloat>(info.min());
-      range_float.to_value = min<libcamera::ControlTypeFloat>(info.max());
-      break;
+      CASE_RANGE(Integer32, range_int)
+      CASE_RANGE(Integer64, range_int)
+      CASE_RANGE(Float, range_float)
+#if LIBCAMERA_VER_GE(0, 4, 0)
+      CASE_RANGE(Unsigned16, range_int)
+      CASE_RANGE(Unsigned32, range_int)
+#endif
     default:
       break;
     }

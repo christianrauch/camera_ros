@@ -1,3 +1,4 @@
+#include "libcamera_version_utils.hpp"
 #include "types.hpp"
 #include <algorithm>
 #include <cassert>
@@ -66,6 +67,12 @@ MIN(Float)
 MAX(Integer32)
 MAX(Integer64)
 MAX(Float)
+#if LIBCAMERA_VER_GE(0, 4, 0)
+MIN(Unsigned16)
+MIN(Unsigned32)
+MAX(Unsigned16)
+MAX(Unsigned32)
+#endif
 
 namespace std
 {
@@ -79,6 +86,17 @@ clamp(const CTRectangle &val, const CTRectangle &lo, const CTRectangle &hi)
 
   return CTRectangle {x, y, width, height};
 }
+
+#if LIBCAMERA_VER_GE(0, 4, 0)
+CTPoint
+clamp(const CTPoint &val, const CTPoint &lo, const CTPoint &hi)
+{
+  const int x = std::clamp(val.x, lo.x, hi.x);
+  const int y = std::clamp(val.y, lo.y, hi.y);
+
+  return CTPoint {x, y};
+}
+#endif
 } // namespace std
 
 
@@ -135,6 +153,11 @@ clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
     CASE_CLAMP(String)
     CASE_CLAMP(Rectangle)
     CASE_CLAMP(Size)
+#if LIBCAMERA_VER_GE(0, 4, 0)
+    CASE_CLAMP(Unsigned16)
+    CASE_CLAMP(Unsigned32)
+    CASE_CLAMP(Point)
+#endif
   }
 
   return {};
@@ -156,6 +179,28 @@ operator>(const libcamera::Rectangle &lhs, const libcamera::Rectangle &rhs)
   return lhs.x < rhs.x && lhs.y < rhs.y && (lhs.x + lhs.width) > (rhs.x + rhs.width) &&
          (lhs.y + lhs.height) > (rhs.y + rhs.height);
 }
+
+#if LIBCAMERA_VER_GE(0, 4, 0)
+int
+squared_sum(const libcamera::Point &p)
+{
+  return p.x * p.x + p.y * p.y;
+}
+
+bool
+operator<(const libcamera::Point &lhs, const libcamera::Point &rhs)
+{
+  // check if lhs point is closer to origin than rhs point
+  return squared_sum(lhs) < squared_sum(rhs);
+}
+
+bool
+operator>(const libcamera::Point &lhs, const libcamera::Point &rhs)
+{
+  // check if lhs point is further away from origin than rhs point
+  return squared_sum(lhs) > squared_sum(rhs);
+}
+#endif
 
 template<typename T>
 bool
@@ -261,6 +306,11 @@ operator<(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs
     CASE_LESS(String)
     CASE_LESS(Rectangle)
     CASE_LESS(Size)
+#if LIBCAMERA_VER_GE(0, 4, 0)
+    CASE_LESS(Unsigned16)
+    CASE_LESS(Unsigned32)
+    CASE_LESS(Point)
+#endif
   }
 
   throw std::runtime_error("unhandled control type " + std::to_string(lhs.type()));
@@ -282,6 +332,11 @@ operator>(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs
     CASE_GREATER(String)
     CASE_GREATER(Rectangle)
     CASE_GREATER(Size)
+#if LIBCAMERA_VER_GE(0, 4, 0)
+    CASE_GREATER(Unsigned16)
+    CASE_GREATER(Unsigned32)
+    CASE_GREATER(Point)
+#endif
   }
 
   throw std::runtime_error("unhandled control type " + std::to_string(lhs.type()));

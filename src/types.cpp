@@ -19,6 +19,11 @@ std::to_string(const libcamera::ControlType id)
     CASE_TYPE(String)
     CASE_TYPE(Rectangle)
     CASE_TYPE(Size)
+#if LIBCAMERA_VER_GE(0, 4, 0)
+    CASE_TYPE(Unsigned16)
+    CASE_TYPE(Unsigned32)
+    CASE_TYPE(Point)
+#endif
   }
 
   return {};
