@@ -1,18 +1,11 @@
 #include "type_extent.hpp"
+#include "libcamera_version_utils.hpp"
 #include <libcamera/base/span.h>
 #include <libcamera/control_ids.h>
 #include <libcamera/controls.h>
-#include <libcamera/version.h>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-
-
-#define LIBCAMERA_VER_GE(major, minor, patch)                               \
-  ((major < LIBCAMERA_VERSION_MAJOR) ||                                     \
-   (major == LIBCAMERA_VERSION_MAJOR && minor < LIBCAMERA_VERSION_MINOR) || \
-   (major == LIBCAMERA_VERSION_MAJOR && minor == LIBCAMERA_VERSION_MINOR && \
-    patch <= LIBCAMERA_VERSION_PATCH))
 
 
 template<typename T, std::enable_if_t<!libcamera::details::is_span<T>::value, bool> = true>
