@@ -9,6 +9,7 @@
 #include <libcamera/stream.h>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -43,13 +44,14 @@ operator<<(std::ostream &out, const libcamera::StreamFormats &formats)
   return out;
 }
 
-std::ostream &
-operator<<(std::ostream &out, const libcamera::StreamConfiguration &configuration)
+std::string
+list_format_sizes(const libcamera::StreamConfiguration &configuration)
 {
+  std::ostringstream out;
   out << std::endl
       << ">> " << configuration.pixelFormat << " format sizes:";
   for (const libcamera::Size &size : configuration.formats().sizes(configuration.pixelFormat))
     out << std::endl
         << "   - " << size.toString();
-  return out;
+  return out.str();
 }

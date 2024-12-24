@@ -331,7 +331,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
   const libcamera::Size size(get_parameter("width").as_int(), get_parameter("height").as_int());
   if (size.isNull()) {
-    RCLCPP_INFO_STREAM(get_logger(), scfg);
+    RCLCPP_INFO_STREAM(get_logger(), list_format_sizes(scfg));
     RCLCPP_WARN_STREAM(get_logger(),
                        "no dimensions selected, auto-selecting: \"" << scfg.size << "\"");
     RCLCPP_WARN_STREAM(get_logger(), "set parameter 'width' or 'height' to silence this warning");
@@ -350,7 +350,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     if (selected_scfg.pixelFormat != scfg.pixelFormat)
       RCLCPP_INFO_STREAM(get_logger(), stream_formats);
     if (selected_scfg.size != scfg.size)
-      RCLCPP_INFO_STREAM(get_logger(), scfg);
+      RCLCPP_INFO_STREAM(get_logger(), list_format_sizes(scfg));
     RCLCPP_WARN_STREAM(get_logger(), "stream configuration adjusted from \""
                                        << selected_scfg.toString() << "\" to \"" << scfg.toString()
                                        << "\"");
