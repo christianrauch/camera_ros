@@ -32,15 +32,25 @@ jobs:
         run: |
           dnf -y install libasan python3-mypy
 
-      - name: build and test
-        uses: ros-tooling/action-ros-ci@v0.3
+      - name: setup rosdep
+        run: |
+          rosdep update
+
+      - name: setup mixins
+        run: |
+          colcon mixin add default https://raw.githubusercontent.com/colcon/colcon-mixin-repository/master/index.yaml
+          colcon mixin update default
+
+      - uses: actions/checkout@v4
         with:
-          package-name: camera_ros
-          target-ros2-distro: ${{ matrix.ros }}
-          colcon-defaults: |
-            {
-              "build": {
-                "mixin": ["asan-gcc", "tsan", "coverage-gcc", "memcheck"]
-              }
-            }
-          colcon-mixin-repository: https://raw.githubusercontent.com/colcon/colcon-mixin-repository/5d51dff38097e8c2bf46d7a5b804e65935aa7f47/index.yaml
+          path: src
+
+      - name: build and test
+        run: |
+          rosdep install --from-paths src --ignore-src -y --rosdistro ${{ matrix.ros }}
+          . /opt/ros/${{ matrix.ros }}/setup.sh
+          colcon build \
+            --event-handlers=console_cohesion+ \
+            --mixin asan-gcc tsan coverage-gcc memcheck \
+            --packages-up-to camera_ros
+          colcon test --return-code-on-test-failure --event-handlers=console_cohesion+
