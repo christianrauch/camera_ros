@@ -29,8 +29,6 @@ jobs:
 
     container:
       image: ${{ matrix.distribution }}:${{ matrix.version }}
-      env:
-        PIP_BREAK_SYSTEM_PACKAGES: 1
 
     steps:
       - name: install ROS 2
