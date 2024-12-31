@@ -364,11 +364,18 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     break;
   }
 
-  if (camera->configure(cfg.get()) < 0)
-    throw std::runtime_error("failed to configure streams");
-
-  RCLCPP_INFO_STREAM(get_logger(), "camera \"" << camera->id() << "\" configured with "
-                                               << scfg.toString() << " stream");
+  switch (camera->configure(cfg.get())) {
+  case -ENODEV:
+    throw std::runtime_error("configure: camera has been disconnected from the system");
+  case -EACCES:
+    throw std::runtime_error("configure: camera is not in a state where it can be configured");
+  case -EINVAL:
+    throw std::runtime_error("configure: configuration \"" + scfg.toString() + "\" is not valid");
+  default:
+    RCLCPP_INFO_STREAM(get_logger(), "camera \"" << camera->id() << "\" configured with "
+                                                 << scfg.toString() << " stream");
+    break;
+  }
 
   // format camera name for calibration file
   const libcamera::ControlList &props = camera->properties();
