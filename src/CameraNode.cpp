@@ -288,8 +288,9 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     throw std::runtime_error("failed to acquire camera");
 
   // configure camera stream
+  const libcamera::StreamRole role = get_role(get_parameter("role").as_string());
   std::unique_ptr<libcamera::CameraConfiguration> cfg =
-    camera->generateConfiguration({get_role(get_parameter("role").as_string())});
+    camera->generateConfiguration({role});
 
   if (!cfg)
     throw std::runtime_error("failed to generate configuration");
@@ -301,7 +302,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   const std::vector<libcamera::PixelFormat> common_fmt = stream_formats.pixelformats();
 
   // list all camera formats, including those not supported by the ROS message
-  RCLCPP_DEBUG_STREAM(get_logger(), "default stream configuration: \"" << scfg.toString() << "\"");
+  RCLCPP_DEBUG_STREAM(get_logger(), "default " << role << " stream configuration: \"" << scfg.toString() << "\"");
   RCLCPP_DEBUG_STREAM(get_logger(), scfg.formats());
 
   if (common_fmt.empty())
