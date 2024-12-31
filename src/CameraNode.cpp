@@ -365,7 +365,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
                                        << "\"");
     break;
   case libcamera::CameraConfiguration::Invalid:
-    throw std::runtime_error("failed to valid stream configurations");
+    throw std::runtime_error("failed to validate stream configurations");
     break;
   }
 
