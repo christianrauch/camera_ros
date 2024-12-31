@@ -306,6 +306,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   const libcamera::StreamFormats stream_formats = get_common_stream_formats(scfg.formats());
   const std::vector<libcamera::PixelFormat> common_fmt = stream_formats.pixelformats();
 
+  RCLCPP_INFO_STREAM(get_logger(), stream_formats);
+
   if (common_fmt.empty())
     throw std::runtime_error("camera does not provide any of the supported pixel formats");
 
@@ -318,7 +320,6 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
       scfg.pixelFormat = common_fmt.front();
     }
 
-    RCLCPP_INFO_STREAM(get_logger(), stream_formats);
     RCLCPP_WARN_STREAM(get_logger(),
                        "no pixel format selected, auto-selecting: \"" << scfg.pixelFormat << "\"");
     RCLCPP_WARN_STREAM(get_logger(), "set parameter 'format' to silence this warning");
@@ -327,22 +328,20 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     // get pixel format from provided string
     const libcamera::PixelFormat format_requested = libcamera::PixelFormat::fromString(format);
     if (!format_requested.isValid()) {
-      RCLCPP_INFO_STREAM(get_logger(), stream_formats);
       throw std::runtime_error("invalid pixel format: \"" + format + "\"");
     }
     // check that the requested format is supported by camera and the node
     if (std::find(common_fmt.begin(), common_fmt.end(), format_requested) == common_fmt.end()) {
-      RCLCPP_INFO_STREAM(get_logger(), stream_formats);
       throw std::runtime_error("unsupported pixel format \"" + format + "\"");
     }
     scfg.pixelFormat = format_requested;
   }
 
+  RCLCPP_INFO_STREAM(get_logger(), list_format_sizes(scfg));
+
   const libcamera::Size size(get_parameter("width").as_int(), get_parameter("height").as_int());
   if (size.isNull()) {
-    RCLCPP_INFO_STREAM(get_logger(), list_format_sizes(scfg));
-    RCLCPP_WARN_STREAM(get_logger(),
-                       "no dimensions selected, auto-selecting: \"" << scfg.size << "\"");
+    RCLCPP_WARN_STREAM(get_logger(), "no dimensions selected, auto-selecting: \"" << scfg.size << "\"");
     RCLCPP_WARN_STREAM(get_logger(), "set parameter 'width' or 'height' to silence this warning");
   }
   else {
@@ -356,10 +355,6 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   case libcamera::CameraConfiguration::Valid:
     break;
   case libcamera::CameraConfiguration::Adjusted:
-    if (selected_scfg.pixelFormat != scfg.pixelFormat)
-      RCLCPP_INFO_STREAM(get_logger(), stream_formats);
-    if (selected_scfg.size != scfg.size)
-      RCLCPP_INFO_STREAM(get_logger(), list_format_sizes(scfg));
     RCLCPP_WARN_STREAM(get_logger(), "stream configuration adjusted from \""
                                        << selected_scfg.toString() << "\" to \"" << scfg.toString()
                                        << "\"");
