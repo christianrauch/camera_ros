@@ -211,7 +211,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   param_descr_role.description = "stream role";
   param_descr_role.additional_constraints = "one of {raw, still, video, viewfinder}";
   param_descr_role.read_only = true;
-  declare_parameter<std::string>("role", "video", param_descr_role);
+  declare_parameter<std::string>("role", "viewfinder", param_descr_role);
 
   // image dimensions
   rcl_interfaces::msg::ParameterDescriptor param_descr_ro;
