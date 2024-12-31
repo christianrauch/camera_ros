@@ -270,7 +270,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     RCLCPP_DEBUG_STREAM(get_logger(), "found camera by name: \"" << name << "\"");
   } break;
   default:
-    RCLCPP_ERROR_STREAM(get_logger(), "unuspported camera parameter type: "
+    RCLCPP_ERROR_STREAM(get_logger(), "unsupported camera parameter type: "
                                         << get_parameter("camera").get_type_name());
     break;
   }
