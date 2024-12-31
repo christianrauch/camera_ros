@@ -1,4 +1,5 @@
 #pragma once
+#include "libcamera_version_utils.hpp"
 #include <cstdint>
 #include <libcamera/controls.h>
 #include <libcamera/geometry.h>
@@ -34,3 +35,8 @@ MAP(float, Float)
 MAP(std::string, String)
 MAP(libcamera::Rectangle, Rectangle)
 MAP(libcamera::Size, Size)
+#if LIBCAMERA_VER_GE(0, 4, 0)
+MAP(uint16_t, Unsigned16)
+MAP(uint32_t, Unsigned32)
+MAP(libcamera::Point, Point)
+#endif

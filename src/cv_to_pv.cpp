@@ -1,4 +1,5 @@
 #include "cv_to_pv.hpp"
+#include "libcamera_version_utils.hpp"
 #include "type_extent.hpp"
 #include "types.hpp"
 #include <cstdint>
@@ -35,29 +36,41 @@ extract_value(const libcamera::ControlValue &value)
 
 template<
   typename T,
-  std::enable_if_t<std::is_arithmetic<T>::value || std::is_same<std::string, T>::value, bool> = true>
+  std::enable_if_t<std::is_constructible<rclcpp::ParameterValue, std::vector<T>>::value, bool> = true>
 rclcpp::ParameterValue
 cv_to_pv_array(const std::vector<T> &values)
 {
   return rclcpp::ParameterValue(values);
 }
 
-template<typename T,
-         std::enable_if_t<!std::is_arithmetic<T>::value && !std::is_same<std::string, T>::value,
-                          bool> = true>
+template<
+  typename T,
+  std::enable_if_t<!std::is_constructible<rclcpp::ParameterValue, std::vector<T>>::value, bool> = true>
 rclcpp::ParameterValue
 cv_to_pv_array(const std::vector<T> & /*values*/)
 {
-  throw invalid_conversion("ParameterValue only supported for arithmetic types");
+  throw invalid_conversion("ParameterValue not constructible from complex type.");
 }
 
 template<
   typename T,
-  std::enable_if_t<std::is_arithmetic<T>::value || std::is_same<std::string, T>::value, bool> = true>
+  std::enable_if_t<std::is_constructible<rclcpp::ParameterValue, T>::value, bool> = true>
 rclcpp::ParameterValue
 cv_to_pv_scalar(const T &value)
 {
   return rclcpp::ParameterValue(value);
+}
+
+rclcpp::ParameterValue
+cv_to_pv_scalar(const uint16_t &val)
+{
+  return rclcpp::ParameterValue(static_cast<int32_t>(val));
+}
+
+rclcpp::ParameterValue
+cv_to_pv_scalar(const uint32_t &val)
+{
+  return rclcpp::ParameterValue(static_cast<int64_t>(val));
 }
 
 rclcpp::ParameterValue
@@ -72,6 +85,14 @@ cv_to_pv_scalar(const libcamera::Size &size)
 {
   return rclcpp::ParameterValue(std::vector<int64_t> {size.width, size.height});
 }
+
+#if LIBCAMERA_VER_GE(0, 4, 0)
+rclcpp::ParameterValue
+cv_to_pv_scalar(const libcamera::Point &point)
+{
+  return rclcpp::ParameterValue(std::vector<int64_t> {point.x, point.y});
+}
+#endif
 
 template<typename T>
 rclcpp::ParameterValue
@@ -103,6 +124,11 @@ cv_to_pv(const libcamera::ControlValue &value)
     CASE_CONVERT(String)
     CASE_CONVERT(Rectangle)
     CASE_CONVERT(Size)
+#if LIBCAMERA_VER_GE(0, 4, 0)
+    CASE_CONVERT(Unsigned16)
+    CASE_CONVERT(Unsigned32)
+    CASE_CONVERT(Point)
+#endif
   }
 
   return {};
@@ -118,6 +144,10 @@ cv_to_pv_type(const libcamera::ControlId *const id)
     case libcamera::ControlType::ControlTypeBool:
       return rclcpp::ParameterType::PARAMETER_BOOL;
     case libcamera::ControlType::ControlTypeByte:
+#if LIBCAMERA_VER_GE(0, 4, 0)
+    case libcamera::ControlType::ControlTypeUnsigned16:
+    case libcamera::ControlType::ControlTypeUnsigned32:
+#endif
     case libcamera::ControlType::ControlTypeInteger32:
     case libcamera::ControlType::ControlTypeInteger64:
       return rclcpp::ParameterType::PARAMETER_INTEGER;
@@ -129,6 +159,10 @@ cv_to_pv_type(const libcamera::ControlId *const id)
       return rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY;
     case libcamera::ControlType::ControlTypeSize:
       return rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY;
+#if LIBCAMERA_VER_GE(0, 4, 0)
+    case libcamera::ControlType::ControlTypePoint:
+      return rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY;
+#endif
     }
   }
   else {
@@ -138,6 +172,10 @@ cv_to_pv_type(const libcamera::ControlId *const id)
     case libcamera::ControlType::ControlTypeBool:
       return rclcpp::ParameterType::PARAMETER_BOOL_ARRAY;
     case libcamera::ControlType::ControlTypeByte:
+#if LIBCAMERA_VER_GE(0, 4, 0)
+    case libcamera::ControlType::ControlTypeUnsigned16:
+    case libcamera::ControlType::ControlTypeUnsigned32:
+#endif
     case libcamera::ControlType::ControlTypeInteger32:
     case libcamera::ControlType::ControlTypeInteger64:
       return rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY;
@@ -149,6 +187,10 @@ cv_to_pv_type(const libcamera::ControlId *const id)
       return rclcpp::ParameterType::PARAMETER_NOT_SET;
     case libcamera::ControlType::ControlTypeSize:
       return rclcpp::ParameterType::PARAMETER_NOT_SET;
+#if LIBCAMERA_VER_GE(0, 4, 0)
+    case libcamera::ControlType::ControlTypePoint:
+      return rclcpp::ParameterType::PARAMETER_NOT_SET;
+#endif
     }
   }
 

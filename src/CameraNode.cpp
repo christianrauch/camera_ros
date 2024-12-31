@@ -70,6 +70,12 @@ namespace rclcpp
 class NodeOptions;
 }
 
+#define CASE_RANGE(T, R)                                       \
+  case libcamera::ControlType##T:                              \
+    R.from_value = max<libcamera::ControlType##T>(info.min()); \
+    R.to_value = min<libcamera::ControlType##T>(info.max());   \
+    break;
+
 
 namespace camera
 {
@@ -270,7 +276,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     RCLCPP_DEBUG_STREAM(get_logger(), "found camera by name: \"" << name << "\"");
   } break;
   default:
-    RCLCPP_ERROR_STREAM(get_logger(), "unuspported camera parameter type: "
+    RCLCPP_ERROR_STREAM(get_logger(), "unsupported camera parameter type: "
                                         << get_parameter("camera").get_type_name());
     break;
   }
@@ -331,7 +337,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
   const libcamera::Size size(get_parameter("width").as_int(), get_parameter("height").as_int());
   if (size.isNull()) {
-    RCLCPP_INFO_STREAM(get_logger(), scfg);
+    RCLCPP_INFO_STREAM(get_logger(), list_format_sizes(scfg));
     RCLCPP_WARN_STREAM(get_logger(),
                        "no dimensions selected, auto-selecting: \"" << scfg.size << "\"");
     RCLCPP_WARN_STREAM(get_logger(), "set parameter 'width' or 'height' to silence this warning");
@@ -350,7 +356,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     if (selected_scfg.pixelFormat != scfg.pixelFormat)
       RCLCPP_INFO_STREAM(get_logger(), stream_formats);
     if (selected_scfg.size != scfg.size)
-      RCLCPP_INFO_STREAM(get_logger(), scfg);
+      RCLCPP_INFO_STREAM(get_logger(), list_format_sizes(scfg));
     RCLCPP_WARN_STREAM(get_logger(), "stream configuration adjusted from \""
                                        << selected_scfg.toString() << "\" to \"" << scfg.toString()
                                        << "\"");
@@ -528,18 +534,13 @@ CameraNode::declareParameters()
     rcl_interfaces::msg::FloatingPointRange range_float;
 
     switch (id->type()) {
-    case libcamera::ControlTypeInteger32:
-      range_int.from_value = max<libcamera::ControlTypeInteger32>(info.min());
-      range_int.to_value = min<libcamera::ControlTypeInteger32>(info.max());
-      break;
-    case libcamera::ControlTypeInteger64:
-      range_int.from_value = max<libcamera::ControlTypeInteger64>(info.min());
-      range_int.to_value = min<libcamera::ControlTypeInteger64>(info.max());
-      break;
-    case libcamera::ControlTypeFloat:
-      range_float.from_value = max<libcamera::ControlTypeFloat>(info.min());
-      range_float.to_value = min<libcamera::ControlTypeFloat>(info.max());
-      break;
+      CASE_RANGE(Integer32, range_int)
+      CASE_RANGE(Integer64, range_int)
+      CASE_RANGE(Float, range_float)
+#if LIBCAMERA_VER_GE(0, 4, 0)
+      CASE_RANGE(Unsigned16, range_int)
+      CASE_RANGE(Unsigned32, range_int)
+#endif
     default:
       break;
     }
