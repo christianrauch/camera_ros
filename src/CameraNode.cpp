@@ -294,6 +294,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   if (!cfg)
     throw std::runtime_error("failed to generate configuration");
 
+  assert(cfg->size() == 1);
   libcamera::StreamConfiguration &scfg = cfg->at(0);
   // get common pixel formats that are supported by the camera and the node
   const libcamera::StreamFormats stream_formats = get_common_stream_formats(scfg.formats());
