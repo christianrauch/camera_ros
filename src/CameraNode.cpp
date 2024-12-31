@@ -297,13 +297,14 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
   assert(cfg->size() == 1);
   libcamera::StreamConfiguration &scfg = cfg->at(0);
-  // get common pixel formats that are supported by the camera and the node
-  const libcamera::StreamFormats stream_formats = get_common_stream_formats(scfg.formats());
-  const std::vector<libcamera::PixelFormat> common_fmt = stream_formats.pixelformats();
 
   // list all camera formats, including those not supported by the ROS message
   RCLCPP_DEBUG_STREAM(get_logger(), "default " << role << " stream configuration: \"" << scfg.toString() << "\"");
   RCLCPP_DEBUG_STREAM(get_logger(), scfg.formats());
+
+  // get common pixel formats that are supported by the camera and the node
+  const libcamera::StreamFormats stream_formats = get_common_stream_formats(scfg.formats());
+  const std::vector<libcamera::PixelFormat> common_fmt = stream_formats.pixelformats();
 
   if (common_fmt.empty())
     throw std::runtime_error("camera does not provide any of the supported pixel formats");
