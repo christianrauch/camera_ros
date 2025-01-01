@@ -211,7 +211,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   param_descr_role.description = "stream role";
   param_descr_role.additional_constraints = "one of {raw, still, video, viewfinder}";
   param_descr_role.read_only = true;
-  declare_parameter<std::string>("role", "video", param_descr_role);
+  declare_parameter<std::string>("role", "viewfinder", param_descr_role);
 
   // image dimensions
   rcl_interfaces::msg::ParameterDescriptor param_descr_ro;
@@ -288,20 +288,25 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     throw std::runtime_error("failed to acquire camera");
 
   // configure camera stream
+  const libcamera::StreamRole role = get_role(get_parameter("role").as_string());
   std::unique_ptr<libcamera::CameraConfiguration> cfg =
-    camera->generateConfiguration({get_role(get_parameter("role").as_string())});
+    camera->generateConfiguration({role});
 
   if (!cfg)
     throw std::runtime_error("failed to generate configuration");
 
+  assert(cfg->size() == 1);
   libcamera::StreamConfiguration &scfg = cfg->at(0);
+
+  // list all camera formats, including those not supported by the ROS message
+  RCLCPP_DEBUG_STREAM(get_logger(), "default " << role << " stream configuration: \"" << scfg.toString() << "\"");
+  RCLCPP_DEBUG_STREAM(get_logger(), scfg.formats());
+
   // get common pixel formats that are supported by the camera and the node
   const libcamera::StreamFormats stream_formats = get_common_stream_formats(scfg.formats());
   const std::vector<libcamera::PixelFormat> common_fmt = stream_formats.pixelformats();
 
-  // list all camera formats, including those not supported by the ROS message
-  RCLCPP_DEBUG_STREAM(get_logger(), "default stream configuration: \"" << scfg.toString() << "\"");
-  RCLCPP_DEBUG_STREAM(get_logger(), scfg.formats());
+  RCLCPP_INFO_STREAM(get_logger(), stream_formats);
 
   if (common_fmt.empty())
     throw std::runtime_error("camera does not provide any of the supported pixel formats");
@@ -315,7 +320,6 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
       scfg.pixelFormat = common_fmt.front();
     }
 
-    RCLCPP_INFO_STREAM(get_logger(), stream_formats);
     RCLCPP_WARN_STREAM(get_logger(),
                        "no pixel format selected, auto-selecting: \"" << scfg.pixelFormat << "\"");
     RCLCPP_WARN_STREAM(get_logger(), "set parameter 'format' to silence this warning");
@@ -324,22 +328,20 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     // get pixel format from provided string
     const libcamera::PixelFormat format_requested = libcamera::PixelFormat::fromString(format);
     if (!format_requested.isValid()) {
-      RCLCPP_INFO_STREAM(get_logger(), stream_formats);
       throw std::runtime_error("invalid pixel format: \"" + format + "\"");
     }
     // check that the requested format is supported by camera and the node
     if (std::find(common_fmt.begin(), common_fmt.end(), format_requested) == common_fmt.end()) {
-      RCLCPP_INFO_STREAM(get_logger(), stream_formats);
       throw std::runtime_error("unsupported pixel format \"" + format + "\"");
     }
     scfg.pixelFormat = format_requested;
   }
 
+  RCLCPP_INFO_STREAM(get_logger(), list_format_sizes(scfg));
+
   const libcamera::Size size(get_parameter("width").as_int(), get_parameter("height").as_int());
   if (size.isNull()) {
-    RCLCPP_INFO_STREAM(get_logger(), list_format_sizes(scfg));
-    RCLCPP_WARN_STREAM(get_logger(),
-                       "no dimensions selected, auto-selecting: \"" << scfg.size << "\"");
+    RCLCPP_WARN_STREAM(get_logger(), "no dimensions selected, auto-selecting: \"" << scfg.size << "\"");
     RCLCPP_WARN_STREAM(get_logger(), "set parameter 'width' or 'height' to silence this warning");
   }
   else {
@@ -353,24 +355,27 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   case libcamera::CameraConfiguration::Valid:
     break;
   case libcamera::CameraConfiguration::Adjusted:
-    if (selected_scfg.pixelFormat != scfg.pixelFormat)
-      RCLCPP_INFO_STREAM(get_logger(), stream_formats);
-    if (selected_scfg.size != scfg.size)
-      RCLCPP_INFO_STREAM(get_logger(), list_format_sizes(scfg));
     RCLCPP_WARN_STREAM(get_logger(), "stream configuration adjusted from \""
                                        << selected_scfg.toString() << "\" to \"" << scfg.toString()
                                        << "\"");
     break;
   case libcamera::CameraConfiguration::Invalid:
-    throw std::runtime_error("failed to valid stream configurations");
+    throw std::runtime_error("failed to validate stream configurations");
     break;
   }
 
-  if (camera->configure(cfg.get()) < 0)
-    throw std::runtime_error("failed to configure streams");
-
-  RCLCPP_INFO_STREAM(get_logger(), "camera \"" << camera->id() << "\" configured with "
-                                               << scfg.toString() << " stream");
+  switch (camera->configure(cfg.get())) {
+  case -ENODEV:
+    throw std::runtime_error("configure: camera has been disconnected from the system");
+  case -EACCES:
+    throw std::runtime_error("configure: camera is not in a state where it can be configured");
+  case -EINVAL:
+    throw std::runtime_error("configure: configuration \"" + scfg.toString() + "\" is not valid");
+  default:
+    RCLCPP_INFO_STREAM(get_logger(), "camera \"" << camera->id() << "\" configured with "
+                                                 << scfg.toString() << " stream");
+    break;
+  }
 
   // format camera name for calibration file
   const libcamera::ControlList &props = camera->properties();

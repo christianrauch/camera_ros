@@ -37,7 +37,7 @@ operator<<(std::ostream &out, const libcamera::StreamFormats &formats)
       << ">> stream formats:";
   for (const libcamera::PixelFormat &pixelformat : formats.pixelformats()) {
     out << std::endl
-        << "   - Pixelformat: " << pixelformat.toString() << " ("
+        << "   - " << pixelformat.toString() << " ("
         << formats.range(pixelformat).min.toString() << " - "
         << formats.range(pixelformat).max.toString() << ")";
   }
