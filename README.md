@@ -2,9 +2,8 @@
 
 This ROS 2 node provides support for a variety of cameras via [libcamera](https://libcamera.org). Amongst others, this node supports V4L2 and [Raspberry Pi cameras](https://www.raspberrypi.com/documentation/computers/camera_software.html).
 
-## Install
 
-### Binary
+## Installation
 
 Binary packages are available via the ROS package repository for some Linux and ROS distributions (check with `rosdep resolve camera_ros`). If it's available, you can install the DEB or RPM packages via:
 ```sh
@@ -16,9 +15,10 @@ sudo apt install ros-$ROS_DISTRO-camera-ros
 sudo dnf install ros-$ROS_DISTRO-camera-ros
 ```
 
-### Source
 
-#### libcamera dependency
+## Build Instructions
+
+### libcamera dependency
 
 The `camera_ros` node depends on libcamera version 0.1 or later.
 
@@ -32,7 +32,7 @@ sudo apt install pkg-config python3-yaml python3-ply python3-jinja2 openssl liby
 sudo dnf install pkgconfig python3-yaml python3-ply python3-jinja2 openssl libyaml-devel openssl-devel libudev-devel libatomic meson
 ```
 
-#### build camera_ros
+### build camera_ros
 
 The `camera_ros` package is built in a colcon workspace. The following instructions assume that you are building libcamera from source in the colcon workspace.
 
@@ -54,6 +54,7 @@ colcon build
 
 If you installed libcamera externally, you can omit the `colcon-meson` and `libcamera` steps. Additionally, if there is a binary package and a rosdep entry for libcamera (check with `rosdep resolve libcamera`) you can also omit `--skip-keys=libcamera` and have this binary dependency resolved automatically.
 
+
 ## Launching the Node
 
 The package provides a standalone node executable:
@@ -68,6 +69,7 @@ and an example launch file for the composable node:
 ```sh
 ros2 launch camera_ros camera.launch.py
 ```
+
 
 ## Interfaces
 
