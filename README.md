@@ -7,13 +7,16 @@ This ROS 2 node provides support for a variety of cameras via [libcamera](https:
 
 Binary packages are available via the ROS package repository for some Linux and ROS distributions (check with `rosdep resolve camera_ros`). If it's available, you can install the DEB or RPM packages via:
 ```sh
-# source ROS distribution
-source /opt/ros/humble/setup.bash
+# source a ROS distribution
+source /opt/ros/$ROS_DISTRO/setup.bash
 # DEB package
 sudo apt install ros-$ROS_DISTRO-camera-ros
 # RPM package
 sudo dnf install ros-$ROS_DISTRO-camera-ros
 ```
+
+> [!NOTE]
+> This also installs the package [`libcamera`](https://index.ros.org/r/libcamera/) as dependency. This is the bloomed version of the official upstream repo at https://git.libcamera.org/libcamera/libcamera.git and may not contain full support for all Raspberry Pi camera modules. If you need full camera module support on Raspberry Pi, you have to build the "raspberrypi" fork from https://github.com/raspberrypi/libcamera manually.
 
 
 ## Build Instructions
