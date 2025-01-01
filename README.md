@@ -21,19 +21,18 @@ sudo dnf install ros-$ROS_DISTRO-camera-ros
 
 ## Build Instructions
 
-### libcamera dependency
+### libcamera
 
-The `camera_ros` node depends on libcamera version 0.1 or later.
+The `camera_ros` node depends on libcamera version 0.1 or later. There are different ways to install this dependency:
 
-Some Linux and ROS distributions provide binary libcamera packages. Check your package manager for `libcamera` and `rosdep resolve libcamera` to see if binary packages are available.
+- __System Package:__ Most Linux distributions provide a binary libcamera package. However, the Raspberry Pi OS uses a [custom libcamera fork](https://github.com/raspberrypi/libcamera) with additional support for newer camera modules. When using the distribution packages, you have to skip the `libcamera` rosdep key when resolving dependencies (`rosdep install [...] --skip-keys=libcamera`).
 
-If your distribution does not provide a binary libcamera package, you have to compile libcamera from source either independent of the colcon workspace according to the [official build instructions](https://libcamera.org/getting-started.html) or as part of the colcon workspace. Either way, you have to install libcamera's build dependencies manually:
-```sh
-# DEB
-sudo apt install pkg-config python3-yaml python3-ply python3-jinja2 openssl libyaml-dev libssl-dev libudev-dev libatomic1 meson
-# RPM
-sudo dnf install pkgconfig python3-yaml python3-ply python3-jinja2 openssl libyaml-devel openssl-devel libudev-devel libatomic meson
-```
+- __ROS Package:__ You can also install a newer version from the ROS repo (package `ros-$ROS_DISTRO-libcamera`). This package will be installed by default when building `camera_ros` from source and resolving the rosdep keys.
+
+- __Source:__ Finally, you can always build libcamera from source. This is currently the only option for using the "raspberrypi" fork on Ubuntu. You can build libcamera as part of the ROS workspace using `colcon-meson`. This is recommended over a system-wide installation as it avoids conflicts with the system package. You will need to install the following dependencies:
+    1. Install the libcamera build dependencies according to https://libcamera.org/getting-started.html#dependencies.
+    2. Install `colcon-meson` via the package manager, `sudo apt install -y python3-colcon-meson`, or pip, `pip install colcon-meson`.
+
 
 ### build camera_ros
 
