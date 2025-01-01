@@ -34,27 +34,32 @@ The `camera_ros` node depends on libcamera version 0.1 or later. There are diffe
     2. Install `colcon-meson` via the package manager, `sudo apt install -y python3-colcon-meson`, or pip, `pip install colcon-meson`.
 
 
-### build camera_ros
+### camera_ros
 
-The `camera_ros` package is built in a colcon workspace. The following instructions assume that you are building libcamera from source in the colcon workspace.
-
+The `camera_ros` package is built together with libcamera in a colcon workspace:
 ```sh
-# create workspace with camera_ros package
-mkdir -p ~/camera_ws/
-cd ~/camera_ws/
-git clone https://github.com/christianrauch/camera_ros.git src/camera_ros
+# create workspace
+mkdir -p ~/camera_ws/src
+cd ~/camera_ws/src
 
-# optional: build libcamera in colcon workspace
-pip install colcon-meson
-git clone https://git.libcamera.org/libcamera/libcamera.git src/libcamera
+# check out libcamera
+# Option A: official upstream
+git clone https://git.libcamera.org/libcamera/libcamera.git
+# Option B: raspberrypi fork with support for newer camera modules
+# git clone https://github.com/raspberrypi/libcamera.git
+
+# check out this camera_ros repository
+git clone https://github.com/christianrauch/camera_ros.git
 
 # resolve binary dependencies and build workspace
-source /opt/ros/humble/setup.bash
+source /opt/ros/$ROS_DISTRO/setup.bash
+cd ~/camera_ws/
 rosdep install --from-paths src --ignore-src --skip-keys=libcamera
 colcon build
 ```
 
-If you installed libcamera externally, you can omit the `colcon-meson` and `libcamera` steps. Additionally, if there is a binary package and a rosdep entry for libcamera (check with `rosdep resolve libcamera`) you can also omit `--skip-keys=libcamera` and have this binary dependency resolved automatically.
+If you are using a binary distribution of libcamera, you can skip adding this to the workspace. Additionally, if you want to use the bloomed libcamera package in the ROS repos, you can also omit `--skip-keys=libcamera` and have this binary dependency resolved automatically.
+
 
 
 ## Launching the Node
