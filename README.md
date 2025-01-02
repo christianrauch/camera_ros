@@ -107,12 +107,12 @@ or dynamically via the [ROS parameter API](https://docs.ros.org/en/rolling/Conce
 
 The camera stream is configured once when the node starts via the following static read-only parameters:
 
-| name              | type                  | description |
-| ----------------- | --------------------- |  ---------- |
-| `camera`          | `integer` or `string` | selects the camera by index (e.g. `0`) or by name (e.g. `/base/soc/i2c0mux/i2c@1/ov5647@36`) [default: `0`]
-| `role`            | `string`              | configures the camera with a `StreamRole` (possible choices: `raw`, `still`, `video`, `viewfinder`) [default: `viewfinder`]
-| `format`          | `string`              | a `PixelFormat` that is supported by the camera [default: auto]
-| `width`, `height` | `integer`             | desired image resolution [default: auto]
+| name              | type                  | description                                                                                                                 |
+| ----------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `camera`          | `integer` or `string` | selects the camera by index (e.g. `0`) or by name (e.g. `/base/soc/i2c0mux/i2c@1/ov5647@36`) [default: `0`]                 |
+| `role`            | `string`              | configures the camera with a `StreamRole` (possible choices: `raw`, `still`, `video`, `viewfinder`) [default: `viewfinder`] |
+| `format`          | `string`              | a `PixelFormat` that is supported by the camera [default: auto]                                                             |
+| `width`, `height` | `integer`             | desired image resolution [default: auto]                                                                                    |
 
 
 The configuration is done in the following order:
