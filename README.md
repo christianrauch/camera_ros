@@ -71,7 +71,7 @@ ros2 launch camera_ros camera.launch.py
 
 ## Interfaces
 
-The camera node interfaces are compatible with the `image_pipeline` stack. The node publishes the camera images and camera parameters and provides a service to set the camera parameters.
+The camera node interfaces are compatible with the [`image_pipeline`](https://github.com/ros-perception/image_pipeline) stack. The node publishes the camera images and camera parameters and provides a service to set the camera parameters.
 
 ### Topics
 
