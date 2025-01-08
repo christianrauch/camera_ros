@@ -55,7 +55,7 @@ git clone https://github.com/christianrauch/camera_ros.git
 # resolve binary dependencies and build workspace
 source /opt/ros/$ROS_DISTRO/setup.bash
 cd ~/camera_ws/
-rosdep install --from-paths src --ignore-src --rosdistro $ROS_DISTRO --skip-keys=libcamera
+rosdep install -y --from-paths src --ignore-src --rosdistro $ROS_DISTRO --skip-keys=libcamera
 colcon build --event-handlers=console_direct+
 ```
 
