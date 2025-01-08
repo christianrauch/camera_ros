@@ -43,6 +43,7 @@ mkdir -p ~/camera_ws/src
 cd ~/camera_ws/src
 
 # check out libcamera
+sudo apt -y install python3-colcon-meson
 # Option A: official upstream
 git clone https://git.libcamera.org/libcamera/libcamera.git
 # Option B: raspberrypi fork with support for newer camera modules
