@@ -43,6 +43,7 @@ mkdir -p ~/camera_ws/src
 cd ~/camera_ws/src
 
 # check out libcamera
+sudo apt -y install python3-colcon-meson
 # Option A: official upstream
 git clone https://git.libcamera.org/libcamera/libcamera.git
 # Option B: raspberrypi fork with support for newer camera modules
@@ -54,8 +55,8 @@ git clone https://github.com/christianrauch/camera_ros.git
 # resolve binary dependencies and build workspace
 source /opt/ros/$ROS_DISTRO/setup.bash
 cd ~/camera_ws/
-rosdep install --from-paths src --ignore-src --skip-keys=libcamera
-colcon build
+rosdep install -y --from-paths src --ignore-src --rosdistro $ROS_DISTRO --skip-keys=libcamera
+colcon build --event-handlers=console_direct+
 ```
 
 If you are using a binary distribution of libcamera, you can skip adding this to the workspace. Additionally, if you want to use the bloomed libcamera package in the ROS repos, you can also omit `--skip-keys=libcamera` and have this binary dependency resolved automatically.
