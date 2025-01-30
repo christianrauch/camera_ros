@@ -140,7 +140,7 @@ cv_to_pv_type(const libcamera::ControlId *const id)
   if (get_extent(id) == 0) {
     switch (id->type()) {
     case libcamera::ControlType::ControlTypeNone:
-      return rclcpp::ParameterType::PARAMETER_NOT_SET;
+      throw unsupported_control(id);
     case libcamera::ControlType::ControlTypeBool:
       return rclcpp::ParameterType::PARAMETER_BOOL;
     case libcamera::ControlType::ControlTypeByte:
@@ -168,7 +168,7 @@ cv_to_pv_type(const libcamera::ControlId *const id)
   else {
     switch (id->type()) {
     case libcamera::ControlType::ControlTypeNone:
-      return rclcpp::ParameterType::PARAMETER_NOT_SET;
+      throw unsupported_control(id);
     case libcamera::ControlType::ControlTypeBool:
       return rclcpp::ParameterType::PARAMETER_BOOL_ARRAY;
     case libcamera::ControlType::ControlTypeByte:
@@ -184,15 +184,15 @@ cv_to_pv_type(const libcamera::ControlId *const id)
     case libcamera::ControlType::ControlTypeString:
       return rclcpp::ParameterType::PARAMETER_STRING_ARRAY;
     case libcamera::ControlType::ControlTypeRectangle:
-      return rclcpp::ParameterType::PARAMETER_NOT_SET;
+      throw unsupported_control(id);
     case libcamera::ControlType::ControlTypeSize:
-      return rclcpp::ParameterType::PARAMETER_NOT_SET;
+      throw unsupported_control(id);
 #if LIBCAMERA_VER_GE(0, 4, 0)
     case libcamera::ControlType::ControlTypePoint:
-      return rclcpp::ParameterType::PARAMETER_NOT_SET;
+      throw unsupported_control(id);
 #endif
     }
   }
 
-  return rclcpp::ParameterType::PARAMETER_NOT_SET;
+  throw should_not_reach();
 }
