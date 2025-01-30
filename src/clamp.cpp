@@ -1,3 +1,4 @@
+#include "exceptions.hpp"
 #include "libcamera_version_utils.hpp"
 #include "types.hpp"
 #include <algorithm>
@@ -140,7 +141,7 @@ clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
       const libcamera::ControlValue &max)
 {
   if (min.type() != max.type())
-    throw std::runtime_error("minimum (" + std::to_string(min.type()) + ") and maximum (" +
+    throw invalid_conversion("minimum (" + std::to_string(min.type()) + ") and maximum (" +
                              std::to_string(max.type()) + ") types mismatch");
 
   switch (value.type()) {
@@ -313,7 +314,7 @@ operator<(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs
 #endif
   }
 
-  throw std::runtime_error("unhandled control type " + std::to_string(lhs.type()));
+  throw should_not_reach();
 }
 
 bool
@@ -339,5 +340,5 @@ operator>(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs
 #endif
   }
 
-  throw std::runtime_error("unhandled control type " + std::to_string(lhs.type()));
+  throw should_not_reach();
 }

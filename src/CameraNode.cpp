@@ -504,13 +504,14 @@ CameraNode::declareParameters()
     rclcpp::ParameterType pv_type;
     try {
       pv_type = cv_to_pv_type(id);
-      if (pv_type == rclcpp::ParameterType::PARAMETER_NOT_SET) {
-        RCLCPP_WARN_STREAM(get_logger(), "unsupported control '" << id->name() << "'");
-        continue;
-      }
     }
-    catch (const std::runtime_error &e) {
-      // ignore
+    catch (const unknown_control &e) {
+      // ignore not yet handled control
+      RCLCPP_WARN_STREAM(get_logger(), e.what());
+      continue;
+    }
+    catch (const unsupported_control &e) {
+      // ignore control which cannot be supported
       RCLCPP_WARN_STREAM(get_logger(), e.what());
       continue;
     }
@@ -528,7 +529,7 @@ CameraNode::declareParameters()
         "}..{" + info.max().toString() + "}" +
         (info.def().isNone() ? std::string {} : " (default: {" + info.def().toString() + "})");
     }
-    catch (const std::runtime_error &e) {
+    catch (const unknown_control &e) {
       // ignore
       RCLCPP_WARN_STREAM(get_logger(), e.what());
       continue;

@@ -1,4 +1,5 @@
 #include "type_extent.hpp"
+#include "exceptions.hpp"
 #include "libcamera_version_utils.hpp"
 #include <libcamera/base/span.h>
 #include <libcamera/control_ids.h>
@@ -85,6 +86,5 @@ get_extent(const libcamera::ControlId *const id)
 #endif
 #endif
 
-  throw std::runtime_error("control " + id->name() + " (" + std::to_string(id->id()) +
-                           ") not handled");
+  throw unknown_control(id);
 }
