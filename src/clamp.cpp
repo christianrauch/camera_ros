@@ -1,3 +1,4 @@
+#include "exceptions.hpp"
 #include "libcamera_version_utils.hpp"
 #include "types.hpp"
 #include <algorithm>
@@ -313,7 +314,7 @@ operator<(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs
 #endif
   }
 
-  throw std::runtime_error("unhandled control type " + std::to_string(lhs.type()));
+  throw should_not_reach();
 }
 
 bool
@@ -339,5 +340,5 @@ operator>(const libcamera::ControlValue &lhs, const libcamera::ControlValue &rhs
 #endif
   }
 
-  throw std::runtime_error("unhandled control type " + std::to_string(lhs.type()));
+  throw should_not_reach();
 }
