@@ -15,7 +15,7 @@
 
 #define CASE_CLAMP(T)             \
   case libcamera::ControlType##T: \
-    return clamp<ControlTypeMap<libcamera::ControlType##T>::type>(value, min, max);
+    return clamp<ControlTypeMap<libcamera::ControlType##T>::type>(value, min, max, id);
 
 #define CASE_NONE(T)              \
   case libcamera::ControlType##T: \
@@ -104,11 +104,25 @@ clamp(const CTPoint &val, const CTPoint &lo, const CTPoint &hi)
 template<typename T>
 libcamera::ControlValue
 clamp_array(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
-            const libcamera::ControlValue &max)
+            const libcamera::ControlValue &max, const libcamera::ControlId *id)
 {
-  const libcamera::Span<const T> v = value.get<libcamera::Span<const T>>();
-  const libcamera::Span<const T> a = min.get<libcamera::Span<const T>>();
-  const libcamera::Span<const T> b = max.get<libcamera::Span<const T>>();
+  libcamera::Span<const T> v;
+  libcamera::Span<const T> a;
+  libcamera::Span<const T> b;
+
+  if (!value.isArray() && id->isArray()) {
+    std::array<T, 1> v_t_arr = {value.get<const T>()};
+    std::array<T, 1> a_t_arr = {min.get<const T>()};
+    std::array<T, 1> b_t_arr = {max.get<const T>()};
+    v = libcamera::Span<const T>(v_t_arr);
+    a = libcamera::Span<const T>(a_t_arr);
+    b = libcamera::Span<const T>(b_t_arr);
+  }
+  else {
+    v = value.get<libcamera::Span<const T>>();
+    a = min.get<libcamera::Span<const T>>();
+    b = max.get<libcamera::Span<const T>>();
+  }
 
   std::vector<T> vclamp(v.size());
 
@@ -122,23 +136,23 @@ template<typename T,
          std::enable_if_t<!std::is_same<std::remove_cv_t<T>, CTBool>::value, bool> = true>
 libcamera::ControlValue
 clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
-      const libcamera::ControlValue &max)
+      const libcamera::ControlValue &max, const libcamera::ControlId *id)
 {
-  return value.isArray() ? clamp_array<T>(value, min, max)
-                         : std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
+  return id->isArray() ? clamp_array<T>(value, min, max, id)
+                       : std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
 }
 
 template<typename T, std::enable_if_t<std::is_same<std::remove_cv_t<T>, CTBool>::value, bool> = true>
 const libcamera::ControlValue &
 clamp(const libcamera::ControlValue &value, const libcamera::ControlValue & /*min*/,
-      const libcamera::ControlValue & /*max*/)
+      const libcamera::ControlValue & /*max*/, const libcamera::ControlId * /*id*/)
 {
   return value;
 }
 
 libcamera::ControlValue
 clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
-      const libcamera::ControlValue &max)
+      const libcamera::ControlValue &max, const libcamera::ControlId *id)
 {
   if (min.type() != max.type())
     throw invalid_conversion("minimum (" + std::to_string(min.type()) + ") and maximum (" +

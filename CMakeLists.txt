@@ -21,6 +21,7 @@ pkg_check_modules(libcamera REQUIRED libcamera>=0.1)
 
 # library with common utility functions for type conversions
 add_library(utils OBJECT
+  src/array_string_utils.cpp
   src/clamp.cpp
   src/cv_to_pv.cpp
   src/format_mapping.cpp
