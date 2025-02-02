@@ -1,4 +1,5 @@
 #include "cv_to_pv.hpp"
+#include "array_string_utils.hpp"
 #include "libcamera_version_utils.hpp"
 #include "type_extent.hpp"
 #include "types.hpp"
@@ -14,7 +15,7 @@
 
 #define CASE_CONVERT(T)           \
   case libcamera::ControlType##T: \
-    return cv_to_pv(extract_value<ControlTypeMap<libcamera::ControlType##T>::type>(value));
+    return cv_to_pv(extract_value<ControlTypeMap<libcamera::ControlType##T>::type>(value), value.isArray());
 
 #define CASE_NONE(T)              \
   case libcamera::ControlType##T: \
@@ -51,6 +52,32 @@ cv_to_pv_array(const std::vector<T> & /*values*/)
 {
   throw invalid_conversion("ParameterValue not constructible from complex type.");
 }
+
+rclcpp::ParameterValue
+cv_to_pv_array(const std::vector<libcamera::Rectangle> &values)
+{
+  std::vector<std::vector<int>> values_converted;
+
+  for (auto &value : values) {
+    values_converted.push_back(std::vector({value.x, value.y, static_cast<int>(value.width), static_cast<int>(value.height)}));
+  }
+
+  return rclcpp::ParameterValue(encode_2d_numeric_array<int>(values_converted));
+}
+
+#if LIBCAMERA_VER_GE(0, 4, 0)
+rclcpp::ParameterValue
+cv_to_pv_array(const std::vector<libcamera::Point> &values)
+{
+  std::vector<std::vector<int>> values_converted;
+
+  for (auto &value : values) {
+    values_converted.push_back(std::vector({value.x, value.y}));
+  }
+
+  return rclcpp::ParameterValue(encode_2d_numeric_array<int>(values_converted));
+}
+#endif
 
 template<
   typename T,
@@ -96,19 +123,20 @@ cv_to_pv_scalar(const libcamera::Point &point)
 
 template<typename T>
 rclcpp::ParameterValue
-cv_to_pv(const std::vector<T> &values)
+cv_to_pv(const std::vector<T> &values, const bool is_array)
 {
-  switch (values.size()) {
-  case 0:
+  if (values.empty()) {
     // empty array
     return rclcpp::ParameterValue();
-  case 1:
+  }
+
+  if (!is_array) {
     // single element (scalar)
     return cv_to_pv_scalar(values[0]);
-  default:
-    // dynamic array
-    return cv_to_pv_array(values);
   }
+
+  // dynamic array
+  return cv_to_pv_array(values);
 }
 
 rclcpp::ParameterValue
@@ -184,12 +212,12 @@ cv_to_pv_type(const libcamera::ControlId *const id)
     case libcamera::ControlType::ControlTypeString:
       return rclcpp::ParameterType::PARAMETER_STRING_ARRAY;
     case libcamera::ControlType::ControlTypeRectangle:
-      throw unsupported_control(id);
+      return rclcpp::ParameterType::PARAMETER_STRING;
     case libcamera::ControlType::ControlTypeSize:
       throw unsupported_control(id);
 #if LIBCAMERA_VER_GE(0, 4, 0)
     case libcamera::ControlType::ControlTypePoint:
-      throw unsupported_control(id);
+      return rclcpp::ParameterType::PARAMETER_STRING;
 #endif
     }
   }

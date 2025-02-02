@@ -1,4 +1,5 @@
 #include "pv_to_cv.hpp"
+#include "array_string_utils.hpp"
 #include "exceptions.hpp"
 #include "libcamera_version_utils.hpp"
 #include "types.hpp"
@@ -18,6 +19,10 @@
 #define CASE_CONVERT_INT_ARRAY(T) \
   case libcamera::ControlType##T: \
     return libcamera::Span<const ControlTypeMap<libcamera::ControlType##T>::type>(std::vector<ControlTypeMap<libcamera::ControlType##T>::type>(values.begin(), values.end()));
+
+#define CASE_CONVERT_STR(T)       \
+  case libcamera::ControlType##T: \
+    return CTString(parameter.as_string());
 
 #define CASE_NONE(T)              \
   case libcamera::ControlType##T: \
@@ -86,7 +91,49 @@ pv_to_cv(const rclcpp::Parameter &parameter, const libcamera::ControlType &type)
   case rclcpp::ParameterType::PARAMETER_DOUBLE:
     return CTFloat(parameter.as_double());
   case rclcpp::ParameterType::PARAMETER_STRING:
-    return CTString(parameter.as_string());
+    switch (type) {
+      CASE_NONE(None)
+      CASE_CONVERT_STR(Bool)
+      CASE_CONVERT_STR(Byte)
+      CASE_CONVERT_STR(Integer32)
+      CASE_CONVERT_STR(Integer64)
+      CASE_CONVERT_STR(Float)
+      CASE_CONVERT_STR(String)
+    case libcamera::ControlTypeRectangle:
+    {
+      std::vector<std::vector<int>> decoded_array = decode_2d_numeric_array<int>(parameter.as_string());
+      std::vector<libcamera::Rectangle> decoded_array_converted;
+
+      for (auto &item : decoded_array) {
+        if (item.size() < 4)
+          continue;
+
+        decoded_array_converted.emplace_back(item[0], item[1], item[2], item[3]);
+      }
+
+      return libcamera::Span<const ControlTypeMap<libcamera::ControlTypeRectangle>::type>(decoded_array_converted);
+    }
+      CASE_CONVERT_STR(Size)
+#if LIBCAMERA_VER_GE(0, 4, 0)
+      CASE_CONVERT_STR(Unsigned16)
+      CASE_CONVERT_STR(Unsigned32)
+    case libcamera::ControlTypePoint:
+    {
+      std::vector<std::vector<int>> decoded_array = decode_2d_numeric_array<int>(parameter.as_string());
+      std::vector<libcamera::Point> decoded_array_converted;
+
+      for (auto &item : decoded_array) {
+        if (item.size() < 2)
+          continue;
+
+        decoded_array_converted.emplace_back(item[0], item[1]);
+      }
+
+      return libcamera::Span<const ControlTypeMap<libcamera::ControlTypePoint>::type>(decoded_array_converted);
+    }
+#endif
+    }
+    throw should_not_reach();
   case rclcpp::ParameterType::PARAMETER_BYTE_ARRAY:
     return libcamera::Span<const CTByte>(parameter.as_byte_array());
   case rclcpp::ParameterType::PARAMETER_BOOL_ARRAY:
