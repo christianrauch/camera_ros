@@ -1,7 +1,7 @@
 #include "exceptions.hpp"
 #include "libcamera_version_utils.hpp"
-#include "types.hpp"
 #include "type_extent.hpp"
+#include "types.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
