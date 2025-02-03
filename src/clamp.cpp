@@ -1,6 +1,7 @@
 #include "exceptions.hpp"
 #include "libcamera_version_utils.hpp"
 #include "types.hpp"
+#include "type_extent.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -110,7 +111,7 @@ clamp_array(const libcamera::ControlValue &value, const libcamera::ControlValue 
   libcamera::Span<const T> a;
   libcamera::Span<const T> b;
 
-  if (!value.isArray() && id->isArray()) {
+  if (!value.isArray() && get_extent(id) != 0) {
     std::array<T, 1> v_t_arr = {value.get<const T>()};
     std::array<T, 1> a_t_arr = {min.get<const T>()};
     std::array<T, 1> b_t_arr = {max.get<const T>()};
@@ -138,8 +139,8 @@ libcamera::ControlValue
 clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
       const libcamera::ControlValue &max, const libcamera::ControlId *id)
 {
-  return id->isArray() ? clamp_array<T>(value, min, max, id)
-                       : std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
+  return (get_extent(id) != 0) ? clamp_array<T>(value, min, max, id)
+                               : std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
 }
 
 template<typename T, std::enable_if_t<std::is_same<std::remove_cv_t<T>, CTBool>::value, bool> = true>
