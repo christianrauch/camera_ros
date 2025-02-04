@@ -1,6 +1,5 @@
 #include "exceptions.hpp"
 #include "libcamera_version_utils.hpp"
-#include "type_extent.hpp"
 #include "types.hpp"
 #include <algorithm>
 #include <cassert>
@@ -16,7 +15,7 @@
 
 #define CASE_CLAMP(T)             \
   case libcamera::ControlType##T: \
-    return clamp<ControlTypeMap<libcamera::ControlType##T>::type>(value, min, max, id);
+    return clamp<ControlTypeMap<libcamera::ControlType##T>::type>(value, min, max, extent);
 
 #define CASE_NONE(T)              \
   case libcamera::ControlType##T: \
@@ -105,30 +104,23 @@ clamp(const CTPoint &val, const CTPoint &lo, const CTPoint &hi)
 template<typename T>
 libcamera::ControlValue
 clamp_array(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
-            const libcamera::ControlValue &max, const libcamera::ControlId *id)
+            const libcamera::ControlValue &max, size_t extent)
 {
-  libcamera::Span<const T> v;
-  libcamera::Span<const T> a;
-  libcamera::Span<const T> b;
+  std::vector<T> vclamp;
 
-  if (!value.isArray() && get_extent(id) != 0) {
-    std::array<T, 1> v_t_arr = {value.get<const T>()};
-    std::array<T, 1> a_t_arr = {min.get<const T>()};
-    std::array<T, 1> b_t_arr = {max.get<const T>()};
-    v = libcamera::Span<const T>(v_t_arr);
-    a = libcamera::Span<const T>(a_t_arr);
-    b = libcamera::Span<const T>(b_t_arr);
+  if (!value.isArray() && extent != 0) {
+    vclamp.push_back(std::clamp(value.get<const T>(), min.get<const T>(), max.get<const T>()));
   }
   else {
-    v = value.get<libcamera::Span<const T>>();
-    a = min.get<libcamera::Span<const T>>();
-    b = max.get<libcamera::Span<const T>>();
+    const libcamera::Span<const T> v = value.get<libcamera::Span<const T>>();
+    const libcamera::Span<const T> a = min.get<libcamera::Span<const T>>();
+    const libcamera::Span<const T> b = max.get<libcamera::Span<const T>>();
+
+    vclamp.reserve(v.size());
+    for (size_t i = 0; i < v.size(); ++i) {
+      vclamp.push_back(std::clamp(v[i], a[i], b[i]));
+    }
   }
-
-  std::vector<T> vclamp(v.size());
-
-  for (size_t i = 0; i < v.size(); i++)
-    vclamp[i] = std::clamp(v[i], a[i], b[i]);
 
   return libcamera::ControlValue(libcamera::Span<const T>(vclamp));
 }
@@ -137,23 +129,23 @@ template<typename T,
          std::enable_if_t<!std::is_same<std::remove_cv_t<T>, CTBool>::value, bool> = true>
 libcamera::ControlValue
 clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
-      const libcamera::ControlValue &max, const libcamera::ControlId *id)
+      const libcamera::ControlValue &max, size_t extent)
 {
-  return (get_extent(id) != 0) ? clamp_array<T>(value, min, max, id)
-                               : std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
+  return (extent != 0) ? clamp_array<T>(value, min, max, extent)
+                       : std::clamp(value.get<T>(), min.get<T>(), max.get<T>());
 }
 
 template<typename T, std::enable_if_t<std::is_same<std::remove_cv_t<T>, CTBool>::value, bool> = true>
 const libcamera::ControlValue &
 clamp(const libcamera::ControlValue &value, const libcamera::ControlValue & /*min*/,
-      const libcamera::ControlValue & /*max*/, const libcamera::ControlId * /*id*/)
+      const libcamera::ControlValue & /*max*/, size_t /*extent*/)
 {
   return value;
 }
 
 libcamera::ControlValue
 clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
-      const libcamera::ControlValue &max, const libcamera::ControlId *id)
+      const libcamera::ControlValue &max, size_t extent)
 {
   if (min.type() != max.type())
     throw invalid_conversion("minimum (" + std::to_string(min.type()) + ") and maximum (" +

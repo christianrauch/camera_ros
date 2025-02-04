@@ -13,7 +13,7 @@ max(const libcamera::ControlValue &value);
 
 libcamera::ControlValue
 clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
-      const libcamera::ControlValue &max, const libcamera::ControlId *id);
+      const libcamera::ControlValue &max, size_t extent);
 
 bool
 operator<(const libcamera::ControlValue &a, const libcamera::ControlValue &b);
