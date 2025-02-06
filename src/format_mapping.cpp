@@ -1,4 +1,5 @@
 #include "format_mapping.hpp"
+#include "libcamera_version_utils.hpp"
 #include <cstdint>
 #include <libcamera/formats.h>
 #include <libcamera/geometry.h>
@@ -24,8 +25,15 @@ static const std::unordered_map<uint32_t, std::string> map_format_raw = {
   // RGB encodings
   // NOTE: Following the DRM definition, RGB formats codes are stored in little-endian order.
   {cam::R8.fourcc(), ros::MONO8},
+#if LIBCAMERA_VER_GE(0, 3, 0)
+  {cam::R16.fourcc(), ros::MONO16},
+#endif
   {cam::RGB888.fourcc(), ros::BGR8},
   {cam::BGR888.fourcc(), ros::RGB8},
+#if LIBCAMERA_VER_GE(0, 3, 0)
+  {cam::RGB161616.fourcc(), ros::BGR16},
+  {cam::BGR161616.fourcc(), ros::RGB16},
+#endif
   {cam::XRGB8888.fourcc(), ros::BGRA8},
   {cam::XBGR8888.fourcc(), ros::RGBA8},
   {cam::ARGB8888.fourcc(), ros::BGRA8},
