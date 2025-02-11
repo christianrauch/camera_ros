@@ -502,6 +502,27 @@ CameraNode::declareParameters()
     // store control id with name
     parameter_ids[id->name()] = id;
 
+    std::size_t extent;
+    try {
+      extent = get_extent(id);
+    }
+    catch (const unknown_control &e) {
+      // ignore
+      RCLCPP_WARN_STREAM(get_logger(), e.what());
+      continue;
+    }
+
+    const bool ctrl_scalar = (extent == 0);
+    const bool ctrl_dynamic = (extent == libcamera::dynamic_extent);
+    const bool ctrl_fixed = !(ctrl_scalar || ctrl_dynamic);
+
+    if (ctrl_fixed && !info.def().isArray()) {
+      RCLCPP_WARN_STREAM(get_logger(),
+                         id->name() << ": cannot set default scalar value "
+                                    << "on span control (extend: " << extent << ")");
+      continue;
+    }
+
     if (info.min().numElements() != info.max().numElements())
       throw std::runtime_error("minimum and maximum parameter array sizes do not match");
 
@@ -523,22 +544,12 @@ CameraNode::declareParameters()
 
     // format type description
     rcl_interfaces::msg::ParameterDescriptor param_descr;
-    try {
-      const std::size_t extent = get_extent(id);
-      const bool scalar = (extent == 0);
-      const bool dynamic = (extent == libcamera::dynamic_extent);
-      const std::string cv_type_descr =
-        scalar ? "scalar" : "array[" + (dynamic ? std::string() : std::to_string(extent)) + "]";
-      param_descr.description =
-        std::to_string(id->type()) + " " + cv_type_descr + " range {" + info.min().toString() +
-        "}..{" + info.max().toString() + "}" +
-        (info.def().isNone() ? std::string {} : " (default: {" + info.def().toString() + "})");
-    }
-    catch (const unknown_control &e) {
-      // ignore
-      RCLCPP_WARN_STREAM(get_logger(), e.what());
-      continue;
-    }
+    const std::string cv_type_descr =
+      ctrl_scalar ? "scalar" : "array[" + (ctrl_dynamic ? std::string() : std::to_string(extent)) + "]";
+    param_descr.description =
+      std::to_string(id->type()) + " " + cv_type_descr + " range {" + info.min().toString() +
+      "}..{" + info.max().toString() + "}" +
+      (info.def().isNone() ? std::string {} : " (default: {" + info.def().toString() + "})");
 
     // get smallest bounds for minimum and maximum set
     rcl_interfaces::msg::IntegerRange range_int;
