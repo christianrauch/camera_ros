@@ -523,8 +523,13 @@ CameraNode::declareParameters()
       continue;
     }
 
-    if (info.min().numElements() != info.max().numElements())
-      throw std::runtime_error("minimum and maximum parameter array sizes do not match");
+    if (info.min().numElements() != info.max().numElements()) {
+      RCLCPP_WARN_STREAM(get_logger(),
+                         id->name() << ": minimum (" << info.min().numElements() << ") and "
+                                    << "maximum (" << info.max().numElements() << ") parameter "
+                                    << "array sizes do not match");
+      continue;
+    }
 
     // check if the control can be mapped to a parameter
     rclcpp::ParameterType pv_type;
