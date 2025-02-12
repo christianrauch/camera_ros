@@ -46,11 +46,20 @@ pv_to_cv_int_array(const std::vector<int64_t> &values, const libcamera::ControlT
     CASE_CONVERT_INT_ARRAY(Float)
     CASE_INVALID(String)
   case libcamera::ControlTypeRectangle:
+    if (values.size() != 4)
+      throw invalid_conversion("integer array size must be equal to 4 for Rectangle conversion");
+
     return libcamera::Rectangle(values[0], values[1], values[2], values[3]);
   case libcamera::ControlTypeSize:
+    if (values.size() != 2)
+      throw invalid_conversion("integer array size must be equal to 2 for Size conversion");
+
     return libcamera::Size(values[0], values[1]);
 #if LIBCAMERA_VER_GE(0, 4, 0)
   case libcamera::ControlTypePoint:
+    if (values.size() != 2)
+      throw invalid_conversion("integer array size must be equal to 2 for Point conversion");
+
     return libcamera::Point(values[0], values[1]);
 #endif
   }
