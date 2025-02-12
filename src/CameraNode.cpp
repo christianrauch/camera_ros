@@ -516,7 +516,7 @@ CameraNode::declareParameters()
     const bool ctrl_dynamic = (extent == libcamera::dynamic_extent);
     const bool ctrl_fixed = !(ctrl_scalar || ctrl_dynamic);
 
-    if (ctrl_fixed && !info.def().isArray()) {
+    if (ctrl_fixed && !info.def().isArray() && !info.def().isNone()) {
       RCLCPP_WARN_STREAM(get_logger(),
                          id->name() << ": cannot set default scalar value "
                                     << "on span control (extend: " << extent << ")");
