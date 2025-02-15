@@ -580,7 +580,7 @@ CameraNode::declareParameters()
     // clamp default ControlValue to min/max range and cast ParameterValue
     rclcpp::ParameterValue value;
     try {
-      value = cv_to_pv(clamp(info.def(), info.min(), info.max()));
+      value = cv_to_pv(clamp(info.def(), info.min(), info.max(), extent));
     }
     catch (const invalid_conversion &e) {
       RCLCPP_ERROR_STREAM(get_logger(), "unsupported control '"
