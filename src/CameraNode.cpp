@@ -220,6 +220,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   declare_parameter<int64_t>("width", {}, param_descr_ro);
   declare_parameter<int64_t>("height", {}, param_descr_ro);
 
+  // camera info file url
+  rcl_interfaces::msg::ParameterDescriptor param_descr_camera_info_url;
+  param_descr_camera_info_url.description = "camera calibration info file url";
+  param_descr_camera_info_url.read_only = true;
+
   // camera ID
   declare_parameter("camera", rclcpp::ParameterValue {}, param_descr_ro.set__dynamic_typing(true));
 
@@ -398,6 +403,15 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
 
   if (!cim.setCameraName(cname))
     throw std::runtime_error("camera name must only contain alphanumeric characters");
+
+  const std::string &camera_info_url = declare_parameter<std::string>(
+    "camera_info_url", {}, param_descr_camera_info_url);
+  if (!cim.loadCameraInfo(camera_info_url)) {
+    if (!camera_info_url.empty()) {
+      RCLCPP_WARN_STREAM(get_logger(), "failed to load camera calibration info from provided URL, using default URL");
+      cim.loadCameraInfo({});
+    }
+  }
 
   declareParameters();
 
