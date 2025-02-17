@@ -12,9 +12,15 @@ resolve_conflicts(const ParameterMap &parameters_default, const ParameterMap &pa
   // auto exposure (AeEnable) and manual exposure (ExposureTime)
   // must not be enabled at the same time
 
+  // assume enabled for unset auto exposure (AeEnable)
+  if (parameters_init.count("AeEnable") &&
+      (parameters_init.at("AeEnable").get_type() == rclcpp::ParameterType::PARAMETER_NOT_SET))
+  {
+    parameters_init.at("AeEnable") = rclcpp::ParameterValue {true};
+  }
+
   // default: prefer auto exposure
   if (parameters_init.count("AeEnable") &&
-      (parameters_init.at("AeEnable").get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET) &&
       parameters_init.at("AeEnable").get<bool>() &&
       parameters_init.count("ExposureTime"))
   {
