@@ -122,6 +122,9 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
       "}..{" + info.max().toString() + "}" +
       (info.def().isNone() ? std::string {} : " (default: {" + info.def().toString() + "})");
 
+    // store descriptor for later re-declaration
+    parameter_descriptors[id->name()] = descriptor;
+
     // Camera controls can have arrays for minimum and maximum values, but the parameter descriptor
     // only supports scalar bounds. Get smallest bounds for minimum and maximum set and warn user.
     if (info.min().isArray() || info.max().isArray()) {
@@ -209,6 +212,20 @@ ParameterHandler::move_control_values(libcamera::ControlList &controls)
   // this will clear the internal control values
   const std::lock_guard<std::mutex> lock(control_values_lock);
   controls = std::move(control_values);
+}
+
+void
+ParameterHandler::redeclare()
+{
+  // rclcpp::Node::set_parameter() implicitly undeclares a parameter if its type
+  // changes to rclcpp::PARAMETER_NOT_SET. Thus, we have to re-declare controls
+  // as parameters.
+
+  for (const auto &[name, _] : camera_controls) {
+    if (!node->has_parameter(name)) {
+      node->declare_parameter(name, rclcpp::ParameterValue {}, parameter_descriptors.at(name), true);
+    }
+  }
 }
 
 void

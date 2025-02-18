@@ -595,6 +595,9 @@ CameraNode::process(libcamera::Request *const request)
       RCLCPP_ERROR_STREAM(get_logger(), "request '" << request->toString() << "' cancelled");
     }
 
+    // redeclare implicitly undeclared parameters
+    parameter_handler.redeclare();
+
     // queue the request again for the next frame and update controls
     request->reuse(libcamera::Request::ReuseBuffers);
     parameter_handler.move_control_values(request->controls());

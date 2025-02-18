@@ -30,6 +30,9 @@ public:
   void
   move_control_values(libcamera::ControlList &controls);
 
+  void
+  redeclare();
+
 private:
   struct control_info_t
   {
@@ -50,6 +53,8 @@ private:
 
   libcamera::ControlList control_values;
   std::mutex control_values_lock;
+
+  std::unordered_map<std::string, rcl_interfaces::msg::ParameterDescriptor> parameter_descriptors;
 
   void
   PreSetResolve(std::vector<rclcpp::Parameter> &parameters);
