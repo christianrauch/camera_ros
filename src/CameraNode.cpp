@@ -1,11 +1,6 @@
-#include "clamp.hpp"
-#include "cv_to_pv.hpp"
+#include "ParameterHandler.hpp"
 #include "format_mapping.hpp"
-#include "parameter_conflict_check.hpp"
 #include "pretty_print.hpp"
-#include "pv_to_cv.hpp"
-#include "type_extent.hpp"
-#include "types.hpp"
 #include <algorithm>
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <cassert>
@@ -35,7 +30,6 @@
 #include <libcamera/request.h>
 #include <libcamera/stream.h>
 #include <memory>
-#include <mutex>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <optional>
@@ -70,12 +64,6 @@ namespace rclcpp
 {
 class NodeOptions;
 }
-
-#define CASE_RANGE(T, R)                                       \
-  case libcamera::ControlType##T:                              \
-    R.from_value = max<libcamera::ControlType##T>(info.min()); \
-    R.to_value = min<libcamera::ControlType##T>(info.max());   \
-    break;
 
 
 namespace camera
@@ -114,21 +102,17 @@ private:
 
   camera_info_manager::CameraInfoManager cim;
 
-  OnSetParametersCallbackHandle::SharedPtr callback_parameter_change;
+  ParameterHandler parameter_handler;
 
-  // map parameter names to libcamera control id
-  std::unordered_map<std::string, const libcamera::ControlId *> parameter_ids;
-  // parameters that are to be set for every request
-  std::unordered_map<unsigned int, libcamera::ControlValue> parameters;
-  // keep track of set parameters
-  ParameterMap parameters_full;
-  std::mutex parameters_mutex;
-  std::unique_lock<std::mutex> parameters_lock {parameters_mutex, std::defer_lock};
+#ifdef RCLCPP_HAS_PARAM_EXT_CB
+  // use new "post_set" callback to apply parameters
+  PostSetParametersCallbackHandle::SharedPtr param_cb_change;
+#else
+  OnSetParametersCallbackHandle::SharedPtr param_cb_change;
+#endif
+
   // compression quality parameter
   std::atomic_uint8_t jpeg_quality;
-
-  void
-  declareParameters();
 
   void
   requestComplete(libcamera::Request *const request);
@@ -136,8 +120,13 @@ private:
   void
   process(libcamera::Request *const request);
 
+  void
+  postParameterChange(const std::vector<rclcpp::Parameter> &parameters);
+
+#ifndef RCLCPP_HAS_PARAM_EXT_CB
   rcl_interfaces::msg::SetParametersResult
   onParameterChange(const std::vector<rclcpp::Parameter> &parameters);
+#endif
 };
 
 RCLCPP_COMPONENTS_REGISTER_NODE(camera::CameraNode)
@@ -199,7 +188,17 @@ compressImageMsg(const sensor_msgs::msg::Image &source,
 }
 
 
-CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", options), cim(this)
+CameraNode::CameraNode(const rclcpp::NodeOptions &options)
+    : Node("camera", options),
+      cim(this),
+      parameter_handler(this),
+      param_cb_change(
+#ifdef RCLCPP_HAS_PARAM_EXT_CB
+        add_post_set_parameters_callback(std::bind(&CameraNode::postParameterChange, this, std::placeholders::_1))
+#else
+        add_on_set_parameters_callback(std::bind(&CameraNode::onParameterChange, this, std::placeholders::_1))
+#endif
+      )
 {
   // pixel format
   rcl_interfaces::msg::ParameterDescriptor param_descr_format;
@@ -413,7 +412,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
     }
   }
 
-  declareParameters();
+  parameter_handler.declare(camera->controls());
 
   // allocate stream buffers and create one request per buffer
   stream = scfg.stream();
@@ -465,14 +464,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options) : Node("camera", opti
   // register callback
   camera->requestCompleted.connect(this, &CameraNode::requestComplete);
 
-  libcamera::ControlList controls_ = camera->controls();
-  for (const auto &[id, value] : parameters)
-    controls_.set(id, value);
-
-  // start camera and queue all requests
-  if (camera->start(&controls_))
+  // start camera with initial controls
+  if (camera->start(&parameter_handler.get_control_values()))
     throw std::runtime_error("failed to start camera");
 
+  // queue all requests
   for (std::unique_ptr<libcamera::Request> &request : requests)
     camera->queueRequest(request.get());
 }
@@ -505,141 +501,6 @@ CameraNode::~CameraNode()
   for (const auto &e : buffer_info)
     if (munmap(e.second.data, e.second.size) == -1)
       std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
-}
-
-void
-CameraNode::declareParameters()
-{
-  // dynamic camera configuration
-  ParameterMap parameters_init;
-  for (const auto &[id, info] : camera->controls()) {
-    // store control id with name
-    parameter_ids[id->name()] = id;
-
-    std::size_t extent;
-    try {
-      extent = get_extent(id);
-    }
-    catch (const unknown_control &e) {
-      // ignore
-      RCLCPP_WARN_STREAM(get_logger(), e.what());
-      continue;
-    }
-
-    const bool ctrl_scalar = (extent == 0);
-    const bool ctrl_dynamic = (extent == libcamera::dynamic_extent);
-    const bool ctrl_fixed = !(ctrl_scalar || ctrl_dynamic);
-
-    if (ctrl_fixed && !info.def().isArray() && !info.def().isNone()) {
-      RCLCPP_WARN_STREAM(get_logger(),
-                         id->name() << ": cannot set default scalar value "
-                                    << "on span control (extend: " << extent << ")");
-      continue;
-    }
-
-    if (info.min().numElements() != info.max().numElements()) {
-      RCLCPP_WARN_STREAM(get_logger(),
-                         id->name() << ": minimum (" << info.min().numElements() << ") and "
-                                    << "maximum (" << info.max().numElements() << ") parameter "
-                                    << "array sizes do not match");
-      continue;
-    }
-
-    // check if the control can be mapped to a parameter
-    rclcpp::ParameterType pv_type;
-    try {
-      pv_type = cv_to_pv_type(id);
-    }
-    catch (const unknown_control &e) {
-      // ignore not yet handled control
-      RCLCPP_WARN_STREAM(get_logger(), e.what());
-      continue;
-    }
-    catch (const unsupported_control &e) {
-      // ignore control which cannot be supported
-      RCLCPP_WARN_STREAM(get_logger(), e.what());
-      continue;
-    }
-
-    // format type description
-    rcl_interfaces::msg::ParameterDescriptor param_descr;
-    const std::string cv_type_descr =
-      ctrl_scalar ? "scalar" : "array[" + (ctrl_dynamic ? std::string() : std::to_string(extent)) + "]";
-    param_descr.description =
-      std::to_string(id->type()) + " " + cv_type_descr + " range {" + info.min().toString() +
-      "}..{" + info.max().toString() + "}" +
-      (info.def().isNone() ? std::string {} : " (default: {" + info.def().toString() + "})");
-
-    // get smallest bounds for minimum and maximum set
-    rcl_interfaces::msg::IntegerRange range_int;
-    rcl_interfaces::msg::FloatingPointRange range_float;
-
-    switch (id->type()) {
-      CASE_RANGE(Integer32, range_int)
-      CASE_RANGE(Integer64, range_int)
-      CASE_RANGE(Float, range_float)
-#if LIBCAMERA_VER_GE(0, 4, 0)
-      CASE_RANGE(Unsigned16, range_int)
-      CASE_RANGE(Unsigned32, range_int)
-#endif
-    default:
-      break;
-    }
-
-    if (range_int.from_value != range_int.to_value)
-      param_descr.integer_range = {range_int};
-    if (range_float.from_value != range_float.to_value)
-      param_descr.floating_point_range = {range_float};
-
-    // clamp default ControlValue to min/max range and cast ParameterValue
-    rclcpp::ParameterValue value;
-    try {
-      value = cv_to_pv(clamp(info.def(), info.min(), info.max()));
-    }
-    catch (const invalid_conversion &e) {
-      RCLCPP_ERROR_STREAM(get_logger(), "unsupported control '"
-                                          << id->name()
-                                          << "' (type: " << std::to_string(info.def().type()) << "): "
-                                          << e.what());
-      continue;
-    }
-
-    // declare parameters and set default or initial value
-    RCLCPP_DEBUG_STREAM(get_logger(),
-                        "declare " << id->name() << " with default " << rclcpp::to_string(value));
-
-    if (value.get_type() == rclcpp::ParameterType::PARAMETER_NOT_SET) {
-      declare_parameter(id->name(), pv_type, param_descr);
-    }
-    else {
-      declare_parameter(id->name(), value, param_descr);
-    }
-    parameters_init[id->name()] = value;
-  }
-
-  // register callback to handle parameter changes
-  // We have to register the callback after parameter declaration
-  // to avoid callbacks interfering with the default parameter check.
-  callback_parameter_change = add_on_set_parameters_callback(
-    std::bind(&CameraNode::onParameterChange, this, std::placeholders::_1));
-
-  // resolve conflicts of default libcamera configuration and user provided overrides
-  std::vector<std::string> status;
-  std::tie(parameters_init, status) =
-    resolve_conflicts(parameters_init, get_node_parameters_interface()->get_parameter_overrides());
-
-  for (const std::string &s : status)
-    RCLCPP_WARN_STREAM(get_logger(), s);
-
-  std::vector<rclcpp::Parameter> parameters_init_list;
-  for (const auto &[name, value] : parameters_init) {
-    if (value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET)
-      parameters_init_list.emplace_back(name, value);
-  }
-  const rcl_interfaces::msg::SetParametersResult param_set_result =
-    set_parameters_atomically(parameters_init_list);
-  if (!param_set_result.successful)
-    RCLCPP_ERROR_STREAM(get_logger(), "Cannot declare parameters with default value: " << param_set_result.reason);
 }
 
 void
@@ -734,101 +595,42 @@ CameraNode::process(libcamera::Request *const request)
       RCLCPP_ERROR_STREAM(get_logger(), "request '" << request->toString() << "' cancelled");
     }
 
-    // queue the request again for the next frame
+    // redeclare implicitly undeclared parameters
+    parameter_handler.redeclare();
+
+    // queue the request again for the next frame and update controls
     request->reuse(libcamera::Request::ReuseBuffers);
-
-    // update parameters
-    parameters_lock.lock();
-    if (!parameters.empty()) {
-      RCLCPP_DEBUG_STREAM(get_logger(), request->toString() << " setting " << parameters.size() << " controls");
-      for (const auto &[id, value] : parameters) {
-        const std::string &name = libcamera::controls::controls.at(id)->name();
-        RCLCPP_DEBUG_STREAM(get_logger(), "apply " << name << ": " << value.toString());
-        request->controls().set(id, value);
-      }
-      parameters.clear();
-    }
-    parameters_lock.unlock();
-
+    parameter_handler.move_control_values(request->controls());
     camera->queueRequest(request);
+
+    for (const auto &[id, value] : request->controls()) {
+      const std::string &name = libcamera::controls::controls.at(id)->name();
+      RCLCPP_DEBUG_STREAM(get_logger(), "applied control '" << name << "': " << (value.isNone() ? "NONE" : value.toString()));
+    }
   }
 }
 
-rcl_interfaces::msg::SetParametersResult
-CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
+void
+CameraNode::postParameterChange(const std::vector<rclcpp::Parameter> &parameters)
 {
-  rcl_interfaces::msg::SetParametersResult result;
-
-  // check target parameter state (current and new parameters)
-  // for conflicting configuration
-  const std::vector<std::string> msgs = check_conflicts(parameters, parameters_full);
-  if (!msgs.empty()) {
-    result.successful = false;
-    for (size_t i = 0; i < msgs.size(); i++) {
-      if (msgs.size() > 1)
-        result.reason += "(" + std::to_string(i) + ") ";
-      result.reason += msgs[i];
-      if (i < msgs.size() - 1)
-        result.reason += "; ";
-    }
-    return result;
-  }
-
-  result.successful = true;
-
+  // check non-control parameters
   for (const rclcpp::Parameter &parameter : parameters) {
-    RCLCPP_DEBUG_STREAM(get_logger(), "setting " << parameter.get_type_name() << " parameter "
-                                                 << parameter.get_name() << " to "
-                                                 << parameter.value_to_string());
-
-    if (parameter_ids.count(parameter.get_name())) {
-      const libcamera::ControlId *id = parameter_ids.at(parameter.get_name());
-      libcamera::ControlValue value = pv_to_cv(parameter, id->type());
-
-      if (!value.isNone()) {
-        // verify parameter type and dimension against default
-        const libcamera::ControlInfo &ci = camera->controls().at(id);
-
-        if (value.type() != id->type()) {
-          result.successful = false;
-          result.reason = parameter.get_name() + ": parameter types mismatch, expected '" +
-                          std::to_string(id->type()) + "', got '" + std::to_string(value.type()) +
-                          "'";
-          return result;
-        }
-
-        const std::size_t extent = get_extent(id);
-        if (value.isArray() &&
-            (extent != libcamera::dynamic_extent) &&
-            (value.numElements() != extent))
-        {
-          result.successful = false;
-          result.reason = parameter.get_name() + ": array dimensions mismatch, expected " +
-                          std::to_string(extent) + ", got " + std::to_string(value.numElements());
-          return result;
-        }
-
-        // check bounds and return error
-        if (value < ci.min() || value > ci.max()) {
-          result.successful = false;
-          result.reason =
-            "parameter value " + value.toString() + " outside of range: " + ci.toString();
-          return result;
-        }
-
-        parameters_lock.lock();
-        this->parameters[parameter_ids.at(parameter.get_name())->id()] = value;
-        parameters_lock.unlock();
-
-        parameters_full[parameter.get_name()] = parameter.get_parameter_value();
-      }
-    }
-    else if (!parameter.get_name().compare("jpeg_quality")) {
+    if (parameter.get_name() == "jpeg_quality") {
       jpeg_quality = parameter.get_parameter_value().get<uint8_t>();
     }
   }
+}
 
+#ifndef RCLCPP_HAS_PARAM_EXT_CB
+rcl_interfaces::msg::SetParametersResult
+CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
+{
+  postParameterChange(parameters);
+
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
   return result;
 }
+#endif
 
 } // namespace camera
