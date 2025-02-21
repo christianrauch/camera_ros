@@ -60,7 +60,7 @@ jobs:
           dnf install -y python3-mypy clang-tools-extra
 
       - name: install bloom
-        run: pip3 install -U git+https://github.com/christianrauch/bloom.git@rpm_cmake_macros
+        run: pip3 install -U git+https://github.com/ros-infrastructure/bloom.git
 
       - name: bloom (ubuntu)
         if: ${{ matrix.distro == 'ubuntu' }}
