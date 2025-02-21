@@ -12,13 +12,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - distro: ubuntu
-            version: 22.04
-            ros_distribution: humble
+          # - distro: ubuntu
+          #   version: 22.04
+          #   ros_distribution: humble
 
-          - distro: ubuntu
-            version: 24.04
-            ros_distribution: jazzy
+          # - distro: ubuntu
+          #   version: 24.04
+          #   ros_distribution: jazzy
 
           - distro: almalinux
             version: 8
