@@ -78,5 +78,5 @@ jobs:
           rosdep update
           bloom-generate rosrpm --ros-distro ${{ matrix.ros_distribution }}
           dnf builddep -y rpm/template.spec
-          rpmbuild -bb --build-in-place rpm/template.spec
+          rpmbuild --define "%__cmake_in_source_build 1" -bb --build-in-place rpm/template.spec
           dnf install -y /github/home/rpmbuild/RPMS/*/ros-${{ matrix.ros_distribution }}-camera-ros-*.rpm
