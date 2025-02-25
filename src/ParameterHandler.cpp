@@ -81,6 +81,8 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
       continue;
     }
 
+    libcamera::ControlValue cv_def = info.def();
+
     // check if the control can be mapped to a parameter
     rclcpp::ParameterType pv_type;
     std::size_t extent;
@@ -103,11 +105,13 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
     const bool ctrl_dynamic = (extent == libcamera::dynamic_extent);
     const bool ctrl_fixed = !(ctrl_scalar || ctrl_dynamic);
 
-    if (ctrl_fixed && !info.def().isArray() && !info.def().isNone()) {
-      RCLCPP_WARN_STREAM(node->get_logger(),
-                         id->name() << ": cannot set default scalar value "
-                                    << "on span control (extend: " << extent << ")");
-      continue;
+    if (ctrl_fixed && !cv_def.isArray() && !cv_def.isNone()) {
+      RCLCPP_WARN_STREAM(
+        node->get_logger(),
+        id->name()
+          << ": cannot set default scalar value '" << cv_def.toString() << "' "
+          << "on span control (extend: " << extent << "), default will be ignored");
+      cv_def = {};
     }
 
     // format type description
@@ -120,7 +124,7 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
     descriptor.description =
       std::to_string(id->type()) + " " + cv_type_descr + " range {" + info.min().toString() +
       "}..{" + info.max().toString() + "}" +
-      (info.def().isNone() ? std::string {} : " (default: {" + info.def().toString() + "})");
+      (cv_def.isNone() ? std::string {} : " (default: {" + cv_def.toString() + "})");
 
     // store descriptor for later re-declaration
     parameter_descriptors[id->name()] = descriptor;
@@ -147,12 +151,12 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
 
     // clamp default ControlValue to min/max range and cast to ParameterValue
     try {
-      parameters[id->name()] = cv_to_pv(clamp(info.def(), info.min(), info.max()));
+      parameters[id->name()] = cv_to_pv(clamp(cv_def, info.min(), info.max()));
     }
     catch (const invalid_conversion &e) {
       RCLCPP_ERROR_STREAM(
         node->get_logger(),
-        "unsupported control '" << id->name() << "' (type: " << std::to_string(info.def().type()) << "): " << e.what());
+        "unsupported control '" << id->name() << "' (type: " << std::to_string(cv_def.type()) << "): " << e.what());
       continue;
     }
 
