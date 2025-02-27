@@ -211,13 +211,15 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   param_descr_role.description = "stream role";
   param_descr_role.additional_constraints = "one of {raw, still, video, viewfinder}";
   param_descr_role.read_only = true;
-  declare_parameter<std::string>("role", "viewfinder", param_descr_role);
+  const libcamera::StreamRole role =
+    get_role(declare_parameter<std::string>("role", "viewfinder", param_descr_role));
 
   // image dimensions
   rcl_interfaces::msg::ParameterDescriptor param_descr_ro;
   param_descr_ro.read_only = true;
-  declare_parameter<int64_t>("width", {}, param_descr_ro);
-  declare_parameter<int64_t>("height", {}, param_descr_ro);
+  const uint32_t w = declare_parameter<int64_t>("width", {}, param_descr_ro);
+  const uint32_t h = declare_parameter<int64_t>("height", {}, param_descr_ro);
+  const libcamera::Size size {w, h};
 
   // camera info file url
   rcl_interfaces::msg::ParameterDescriptor param_descr_camera_info_url;
@@ -298,7 +300,6 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     throw std::runtime_error("failed to acquire camera");
 
   // configure camera stream
-  const libcamera::StreamRole role = get_role(get_parameter("role").as_string());
   std::unique_ptr<libcamera::CameraConfiguration> cfg =
     camera->generateConfiguration({role});
 
@@ -348,7 +349,6 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
 
   RCLCPP_INFO_STREAM(get_logger(), list_format_sizes(scfg));
 
-  const libcamera::Size size(get_parameter("width").as_int(), get_parameter("height").as_int());
   if (size.isNull()) {
     RCLCPP_WARN_STREAM(get_logger(), "no dimensions selected, auto-selecting: \"" << scfg.size << "\"");
     RCLCPP_WARN_STREAM(get_logger(), "set parameter 'width' or 'height' to silence this warning");
