@@ -221,6 +221,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   const uint32_t h = declare_parameter<int64_t>("height", {}, param_descr_ro);
   const libcamera::Size size {w, h};
 
+  // Raw format dimensions
+  const uint32_t mode_width = declare_parameter<int64_t>("mode_width", {}, param_descr_ro);
+  const uint32_t mode_height = declare_parameter<int64_t>("mode_height", {}, param_descr_ro);
+  const libcamera::Size mode_size {mode_width, mode_height};
+
   // camera info file url
   rcl_interfaces::msg::ParameterDescriptor param_descr_camera_info_url;
   param_descr_camera_info_url.description = "camera calibration info file url";
@@ -299,18 +304,26 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   if (camera->acquire())
     throw std::runtime_error("failed to acquire camera");
 
+  std::vector<libcamera::StreamRole> roles;
+  roles.push_back(role);
+
+  // Add the RAW role if the mode_size is defined
+  if (!mode_size.isNull() && roles.front() != libcamera::StreamRole::Raw) {
+    roles.push_back(libcamera::StreamRole::Raw);
+  }
+
   // configure camera stream
   std::unique_ptr<libcamera::CameraConfiguration> cfg =
-    camera->generateConfiguration({role});
+    camera->generateConfiguration(roles);
 
   if (!cfg)
     throw std::runtime_error("failed to generate configuration");
 
-  assert(cfg->size() == 1);
+  assert(cfg->size() >= 1);
   libcamera::StreamConfiguration &scfg = cfg->at(0);
 
   // list all camera formats, including those not supported by the ROS message
-  RCLCPP_DEBUG_STREAM(get_logger(), "default " << role << " stream configuration: \"" << scfg.toString() << "\"");
+  RCLCPP_DEBUG_STREAM(get_logger(), "default " << roles.front() << " stream configuration: \"" << scfg.toString() << "\"");
   RCLCPP_DEBUG_STREAM(get_logger(), scfg.formats());
 
   // get common pixel formats that are supported by the camera and the node
@@ -355,6 +368,12 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   }
   else {
     scfg.size = size;
+  }
+
+  if (!mode_size.isNull() && roles.front() != libcamera::StreamRole::Raw) {
+    libcamera::StreamConfiguration &modecfg = cfg->at(1);
+    modecfg.size = mode_size;
+    RCLCPP_INFO_STREAM(get_logger(), "Sensor mode configuration: " << modecfg.toString());
   }
 
   // store selected stream configuration
