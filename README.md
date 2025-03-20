@@ -117,13 +117,14 @@ or dynamically via the [ROS parameter API](https://docs.ros.org/en/rolling/Conce
 
 The camera stream is configured once when the node starts via the following static read-only parameters:
 
-| name              | type                  | description                                                                                                                 |
-| ----------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `camera`          | `integer` or `string` | selects the camera by index (e.g. `0`) or by name (e.g. `/base/soc/i2c0mux/i2c@1/ov5647@36`) [default: `0`]                 |
-| `role`            | `string`              | configures the camera with a `StreamRole` (possible choices: `raw`, `still`, `video`, `viewfinder`) [default: `viewfinder`] |
-| `format`          | `string`              | a `PixelFormat` that is supported by the camera [default: auto]                                                             |
-| `width`, `height` | `integer`             | desired image resolution [default: auto]                                                                                    |
-| `sensor_mode`     | `string`              | desired raw sensor format resolution (format: `width:height`) [default: auto]                                               |
+| name              | type                  | description                                                                                                                       |
+| ----------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `camera`          | `integer` or `string` | selects the camera by index (e.g. `0`) or by name (e.g. `/base/soc/i2c0mux/i2c@1/ov5647@36`) [default: `0`]                       |
+| `role`            | `string`              | configures the camera with a `StreamRole` (possible choices: `raw`, `still`, `video`, `viewfinder`) [default: `viewfinder`]       |
+| `format`          | `string`              | a `PixelFormat` that is supported by the camera [default: auto]                                                                   |
+| `width`, `height` | `integer`             | desired image resolution [default: auto]                                                                                          |
+| `sensor_mode`     | `string`              | desired raw sensor format resolution (format: `width:height`) [default: auto]                                                     |
+| `camera_info_url` | `string`              | URL for a camera calibration YAML file (e.g. `file:///home/nonroot/camera_calib.yaml`) [default: `~/.ros/camera_info/$NAME.yaml`] |
 
 
 The configuration is done in the following order:
@@ -132,6 +133,7 @@ The configuration is done in the following order:
 3. set the pixel format for the stream via `format`
 4. set the image resolution for the stream via `width` and `height`
 5. set the sensor mode resolution for the raw feed from camera to GPU
+6. make `CameraInfoManager` load the camera calibration information file
 
 Each stream role only supports a discrete set of data stream configurations as a combination of the image resolution and pixel format. The selected stream configuration is validated at the end of this sequence and adjusted to the closest valid stream configuration.
 
@@ -162,7 +164,11 @@ ros2 run camera_ros camera_node --ros-args -p FrameDurationLimits:="[50000,50000
 
 ## Calibration
 
-The node uses the `CameraInfoManager` to manage the [camera parameters](https://docs.ros.org/en/rolling/p/image_pipeline/camera_info.html), such as the camera intrinsics for projection and distortion coefficients for rectification. Its tasks include loading the parameters from the calibration file `~/.ros/camera_info/$NAME.yaml`, publishing them on `~/camera_info` and setting new parameters via service `~/set_camera_info`.
+The node uses the `CameraInfoManager` to manage the [camera parameters](https://docs.ros.org/en/rolling/p/image_pipeline/camera_info.html), such as the camera intrinsics for projection and distortion coefficients for rectification. Its tasks include loading the parameters from the calibration file, publishing them on `~/camera_info` and setting new parameters via service `~/set_camera_info`.
+
+The URL for the camera calibration file can be set using the `camera_info_url` parameter, however it defaults to `~/.ros/camera_info/$NAME.yaml`. Note that when setting the URL manually, the provided string must be in the URL format, not a local file path.
+
+For example, if your camera calibration file is located at `/home/$USERNAME/camera/calibration.yaml`, you must pass `file:///home/$USERNAME/camera/calibration.yaml`. Passing a normal file path (`/home/$USERNAME/camera/calibration.yaml`) will not work, and will result in an `Invalid camera calibration URL` error.
 
 If the camera has not been calibrated yet and the calibration file does not exist, the node will warn the user about the missing file (`Camera calibration file ~/.ros/camera_info/$NAME.yaml not found`) and publish zero-initialised intrinsic parameters. If you do not need to project between the 2D image plane and the 3D camera frame or rectify the image, you can safely ignore this.
 
