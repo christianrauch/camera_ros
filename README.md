@@ -124,6 +124,7 @@ The camera stream is configured once when the node starts via the following stat
 | `format`          | `string`              | a `PixelFormat` that is supported by the camera [default: auto]                                                             |
 | `width`, `height` | `integer`             | desired image resolution [default: auto]                                                                                    |
 | `sensor_mode`     | `string`              | desired raw sensor format resolution (format: `width:height`) [default: auto]                                               |
+| `camera_info_url` | `string`              | URL for a camera calibration YAML file (see [Calibration](#calibration)) [default: `~/.ros/camera_info/$NAME.yaml`]         |
 
 
 The configuration is done in the following order:
@@ -162,7 +163,9 @@ ros2 run camera_ros camera_node --ros-args -p FrameDurationLimits:="[50000,50000
 
 ## Calibration
 
-The node uses the `CameraInfoManager` to manage the [camera parameters](https://docs.ros.org/en/rolling/p/image_pipeline/camera_info.html), such as the camera intrinsics for projection and distortion coefficients for rectification. Its tasks include loading the parameters from the calibration file `~/.ros/camera_info/$NAME.yaml`, publishing them on `~/camera_info` and setting new parameters via service `~/set_camera_info`.
+The node uses the `CameraInfoManager` to manage the [camera parameters](https://docs.ros.org/en/rolling/p/image_pipeline/camera_info.html), such as the camera intrinsics for projection and distortion coefficients for rectification. Its tasks include loading the parameters from the calibration file, publishing them on `~/camera_info` and setting new parameters via service `~/set_camera_info`.
+
+The URL for the camera calibration file can be set using the `camera_info_url` parameter, however it defaults to `~/.ros/camera_info/$NAME.yaml`. Note that when setting the URL manually, the provided string must be in the URL format, not a local file path (eg. `file:///home/nonroot/camera/calibration.yaml`). For more information, please take a look at the `CameraInfoManager` [API documentation](https://docs.ros.org/en/ros2_packages/rolling/api/camera_info_manager/generated/classcamera__info__manager_1_1CameraInfoManager.html).
 
 If the camera has not been calibrated yet and the calibration file does not exist, the node will warn the user about the missing file (`Camera calibration file ~/.ros/camera_info/$NAME.yaml not found`) and publish zero-initialised intrinsic parameters. If you do not need to project between the 2D image plane and the 3D camera frame or rectify the image, you can safely ignore this.
 
