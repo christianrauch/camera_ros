@@ -71,6 +71,11 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
   // to unset them (set their type to 'rclcpp::ParameterType::PARAMETER_NOT_SET').
   // Unsetting a statically typed parameter causes "cannot undeclare a statically typed parameter".
 
+  if (controls.empty()) {
+    RCLCPP_DEBUG_STREAM(node->get_logger(), "No controls to declare.");
+    return;
+  }
+
   ParameterConflictHandler::ParameterValueMap parameters;
   for (const auto &[id, info] : controls) {
     if (info.min().numElements() != info.max().numElements()) {
