@@ -160,7 +160,7 @@ ParameterConflictHandler::check(const std::vector<rclcpp::Parameter> &parameters
 }
 
 void
-ParameterConflictHandler::restore(std::vector<rclcpp::Parameter> &parameters)
+ParameterConflictHandler::restore(std::vector<rclcpp::Parameter> &parameters, const std::unordered_set<std::string> &camera_controls)
 {
   // Temporarily store the restored parameter values and only apply them
   // if consecutive checks pass. If checks fail, drop these temporary
@@ -170,7 +170,7 @@ ParameterConflictHandler::restore(std::vector<rclcpp::Parameter> &parameters)
 
   tmp_store = store;
 
-  if (is_set(parameters, (HAS_ETM ? ETM : AE))) {
+  if (is_set(parameters, (HAS_ETM ? ETM : AE)) && camera_controls.count(ET)) {
     // restore 'ExposureTime' when 'AeEnable' is off
     if (HAS_ETM ? is_int_eq(parameters, ETM, ETM_Manual) : !is_true(parameters, AE)) {
       if (tmp_store.count(ET)) {

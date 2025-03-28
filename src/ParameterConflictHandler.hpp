@@ -3,6 +3,7 @@
 #include <rclcpp/parameter_value.hpp>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 
@@ -20,7 +21,7 @@ public:
   resolve_overrides(ParameterValueMap &p);
 
   void
-  restore(std::vector<rclcpp::Parameter> &parameters);
+  restore(std::vector<rclcpp::Parameter> &parameters, const std::unordered_set<std::string> &camera_controls);
 
   static std::vector<std::string>
   check(const std::vector<rclcpp::Parameter> &parameters_old,

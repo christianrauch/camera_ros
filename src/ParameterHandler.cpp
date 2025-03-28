@@ -240,7 +240,11 @@ ParameterHandler::redeclare()
 void
 ParameterHandler::PreSetResolve(std::vector<rclcpp::Parameter> &parameters)
 {
-  parameter_conflict_handler.restore(parameters);
+  std::unordered_set<std::string> controls;
+  for (const auto &[n, i] : camera_controls) {
+    controls.insert(n);
+  }
+  parameter_conflict_handler.restore(parameters, controls);
 }
 
 rcl_interfaces::msg::SetParametersResult
