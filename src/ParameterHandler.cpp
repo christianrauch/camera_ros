@@ -45,7 +45,7 @@ format_result(const std::vector<std::string> &msgs)
 }
 
 ParameterHandler::ParameterHandler(rclcpp::Node *const node)
-    : node(node), parameter_conflict_handler()
+    : node(node)
 {
   param_cb_on = node->add_on_set_parameters_callback(
     std::bind(&ParameterHandler::OnSetValidate, this, std::placeholders::_1));
