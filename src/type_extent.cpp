@@ -39,7 +39,9 @@ get_extent(const libcamera::ControlId *const id)
 {
 #if LIBCAMERA_VER_GE(0, 1, 0)
   IF(AeEnable)
+#if !LIBCAMERA_VER_GE(0, 5, 0)
   IF(AeLocked)
+#endif
   IF(AeMeteringMode)
   IF(AeConstraintMode)
   IF(AeExposureMode)
