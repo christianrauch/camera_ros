@@ -91,6 +91,10 @@ get_extent(const libcamera::ControlId *const id)
 #endif
 #endif
 
+#if LIBCAMERA_VER_GE(0, 4, 0)
+  IF(Gamma)
+#endif
+
 #if LIBCAMERA_VER_GE(0, 5, 0)
   IF(AeState)
   IF(ExposureTimeMode)
