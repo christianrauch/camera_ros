@@ -90,5 +90,11 @@ get_extent(const libcamera::ControlId *const id)
 #endif
 #endif
 
+#if LIBCAMERA_VER_GE(0, 5, 0)
+  IF(AeState)
+  IF(ExposureTimeMode)
+  IF(AnalogueGainMode)
+#endif
+
   throw unknown_control(id);
 }
