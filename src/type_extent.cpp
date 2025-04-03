@@ -81,6 +81,7 @@ get_extent(const libcamera::ControlId *const id)
 
 #if LIBCAMERA_VER_GE(0, 2, 0)
   IF(HdrMode)
+  IF(HdrChannel)
   IF(AeFlickerPeriod)
   IF(AeFlickerMode)
 #ifdef LIBCAMERA_HAS_RPI_VENDOR_CONTROLS
