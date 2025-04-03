@@ -103,6 +103,9 @@ get_extent(const libcamera::ControlId *const id)
   IF(AeState)
   IF(ExposureTimeMode)
   IF(AnalogueGainMode)
+#ifdef LIBCAMERA_HAS_RPI_VENDOR_CONTROLS
+  IF(rpi::PispStatsOutput)
+#endif
 #endif
 
   throw unknown_control(id);
