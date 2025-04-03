@@ -93,6 +93,7 @@ get_extent(const libcamera::ControlId *const id)
 
 #if LIBCAMERA_VER_GE(0, 4, 0)
   IF(Gamma)
+  IF(DebugMetadataEnable)
 #endif
 
 #if LIBCAMERA_VER_GE(0, 5, 0)
