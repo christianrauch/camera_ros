@@ -1,10 +1,22 @@
 #include "ParameterConflictHandler.hpp"
+#include "libcamera_version_utils.hpp"
 #include <libcamera/control_ids.h>
 
+#define HAS_ETM LIBCAMERA_VER_GE(0, 5, 0)
 
 // use alias for control names from controls to avoid typos and detect API breakage
 static const std::string &AE = libcamera::controls::AeEnable.name();
 static const std::string &ET = libcamera::controls::ExposureTime.name();
+#if HAS_ETM
+static const std::string &ETM = libcamera::controls::ExposureTimeMode.name();
+static constexpr auto ETM_Auto = libcamera::controls::ExposureTimeModeEnum::ExposureTimeModeAuto;
+static constexpr auto ETM_Manual = libcamera::controls::ExposureTimeModeEnum::ExposureTimeModeManual;
+#else
+// fake placeholder data
+static const std::string ETM = {};
+static constexpr int ETM_Auto = {};
+static constexpr int ETM_Manual = {};
+#endif
 
 
 auto
@@ -31,6 +43,17 @@ is_true(const std::vector<rclcpp::Parameter> &parameters,
   return (control != parameters.end()) &&
          (control->get_type() == rclcpp::ParameterType::PARAMETER_BOOL) &&
          control->as_bool();
+}
+
+bool
+is_int_eq(const std::vector<rclcpp::Parameter> &parameters,
+          const std::string &name,
+          const int64_t &value)
+{
+  const auto control = find(parameters, name);
+  return (control != parameters.end()) &&
+         (control->get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) &&
+         (control->as_int() == value);
 }
 
 std::vector<rclcpp::Parameter>
@@ -69,8 +92,12 @@ ParameterConflictHandler::resolve_defaults(ParameterValueMap &p)
   std::vector<std::string> msgs;
 
   // assume enabled for unset auto exposure (AeEnable)
-  if (p.count(AE) && (p.at(AE).get_type() == rclcpp::ParameterType::PARAMETER_NOT_SET)) {
+  if (p.count(HAS_ETM ? ETM : AE) && (p.at(HAS_ETM ? ETM : AE).get_type() == rclcpp::ParameterType::PARAMETER_NOT_SET)) {
+#if HAS_ETM
+    p.at(ETM) = rclcpp::ParameterValue {ETM_Auto};
+#else
     p.at(AE) = rclcpp::ParameterValue {true};
+#endif
   }
 
   // default: prefer auto exposure
@@ -92,11 +119,17 @@ ParameterConflictHandler::resolve_overrides(ParameterValueMap &p)
   // overrides: prefer provided exposure
   if (conflict_exposure(p)) {
     // disable auto exposure
+#if HAS_ETM
+    p.at(ETM) = rclcpp::ParameterValue {ETM_Manual};
+#else
     p.at(AE) = rclcpp::ParameterValue {false};
+#endif
     msgs.emplace_back("AeEnable and ExposureTime must not be enabled at the same time. 'AeEnable' will be set to off.");
   }
   // restore 'ExposureTime'
-  if (is_set(p, AE) && !p.at(AE).get<bool>()) {
+  if (is_set(p, HAS_ETM ? ETM : AE) &&
+      (HAS_ETM ? (p.at(ETM).get<int32_t>() != ETM_Auto) : !p.at(AE).get<bool>()))
+  {
     p.at(ET) = store.at(ET);
     store.erase(ET);
   }
@@ -112,7 +145,9 @@ ParameterConflictHandler::check(const std::vector<rclcpp::Parameter> &parameters
   const std::vector<rclcpp::Parameter> parameter_merged = merge(parameters_old, parameters_new);
 
   // ExposureTime must not be set while AeEnable is true
-  if (is_set(parameter_merged, AE) && is_true(parameter_merged, AE) && is_set(parameters_new, ET))
+  if (is_set(parameter_merged, HAS_ETM ? ETM : AE) &&
+      (HAS_ETM ? is_int_eq(parameter_merged, ETM, ETM_Auto) : is_true(parameter_merged, AE)) &&
+      is_set(parameters_new, ET))
     msgs.emplace_back("AeEnable and ExposureTime must not be set simultaneously");
 
   return msgs;
@@ -129,9 +164,9 @@ ParameterConflictHandler::restore(std::vector<rclcpp::Parameter> &parameters)
 
   tmp_store = store;
 
-  if (is_set(parameters, AE)) {
+  if (is_set(parameters, (HAS_ETM ? ETM : AE))) {
     // restore 'ExposureTime' when 'AeEnable' is off
-    if (!is_true(parameters, AE)) {
+    if (HAS_ETM ? !is_int_eq(parameters, ETM, ETM_Auto) : !is_true(parameters, AE)) {
       if (tmp_store.count(ET)) {
         parameters.push_back({ET, tmp_store.at(ET)});
         tmp_store.erase(ET);
@@ -160,5 +195,7 @@ bool
 ParameterConflictHandler::conflict_exposure(const ParameterValueMap &p)
 {
   // auto exposure must not be enabled while fixed exposure time is set
-  return is_set(p, AE) && p.at(AE).get<bool>() && is_set(p, ET);
+  return is_set(p, HAS_ETM ? ETM : AE) &&
+         (HAS_ETM ? (p.at(ETM).get<int32_t>() == ETM_Auto) : (p.at(AE).get<bool>())) &&
+         is_set(p, ET);
 }
