@@ -11,6 +11,8 @@ endif()
 find_package(PkgConfig REQUIRED)
 
 # find dependencies
+find_package(gtest_vendor REQUIRED)
+find_package(ament_cmake_ros REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
