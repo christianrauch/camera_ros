@@ -264,7 +264,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   param_descr_camera_info_url.read_only = true;
 
   // camera ID
-  declare_parameter("camera", rclcpp::ParameterValue {}, param_descr_ro.set__dynamic_typing(true));
+  const rclcpp::ParameterValue &camera_id =
+    declare_parameter("camera", rclcpp::ParameterValue {}, param_descr_ro.set__dynamic_typing(true));
 
   // we cannot control the compression rate of the libcamera MJPEG stream
   // ignore "jpeg_quality" parameter for MJPEG streams
@@ -295,7 +296,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     throw std::runtime_error("no cameras available");
 
   // get the camera
-  switch (get_parameter("camera").get_type()) {
+  switch (camera_id.get_type()) {
   case rclcpp::ParameterType::PARAMETER_NOT_SET:
     // use first camera as default
     camera = camera_manager.cameras().front();
@@ -306,7 +307,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     break;
   case rclcpp::ParameterType::PARAMETER_INTEGER:
   {
-    const size_t id = get_parameter("camera").as_int();
+    const size_t &id = camera_id.get<rclcpp::ParameterType::PARAMETER_INTEGER>();
     if (id >= camera_manager.cameras().size()) {
       RCLCPP_INFO_STREAM(get_logger(), camera_manager);
       throw std::runtime_error("camera with id " + std::to_string(id) + " does not exist");
@@ -316,7 +317,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   } break;
   case rclcpp::ParameterType::PARAMETER_STRING:
   {
-    const std::string name = get_parameter("camera").as_string();
+    const std::string &name = camera_id.get<rclcpp::ParameterType::PARAMETER_STRING>();
     camera = camera_manager.get(name);
     if (!camera) {
       RCLCPP_INFO_STREAM(get_logger(), camera_manager);
@@ -325,8 +326,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     RCLCPP_DEBUG_STREAM(get_logger(), "found camera by name: \"" << name << "\"");
   } break;
   default:
-    RCLCPP_ERROR_STREAM(get_logger(), "unsupported camera parameter type: "
-                                        << get_parameter("camera").get_type_name());
+    RCLCPP_FATAL_STREAM(get_logger(), "unsupported camera parameter type: "
+                                        << rclcpp::to_string(camera_id.get_type()));
     break;
   }
 
