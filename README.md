@@ -142,7 +142,7 @@ The node avoids memory copies of the image data by directly mapping from a camer
 
 ### Sensor Modes and Cropping
 
-Most camera modules provide different sensor modes, some of which provide a smaller resolution version of the full picture, whereas others have a limited field-of-view, e.g. by allowing for the selection of a 3:2 image from a 16:9 sensor, a more native 'digital zoom' effect by cropping the picture etc. The benefit of this is to perform compute intensive tasks at the source (the sensor), rather than downstream in the GPU or in application code. Unless we specify the sensor mode we want, libcamera will automatically select one. Unfortunately, it is not guaranteed that the selected mode will be a full sensor mode, leading to a potential cropping of the picture. 
+Most camera modules provide different sensor modes, some of which provide a smaller resolution version of the full picture, whereas others have a limited field-of-view, e.g. by allowing for the selection of a 3:2 image from a 16:9 sensor, a more native 'digital zoom' effect by cropping the picture etc. The benefit of this is to perform compute intensive tasks at the source (the sensor), rather than downstream in the GPU or in application code. Unless we specify the sensor mode we want, libcamera will automatically select one. Unfortunately, it is not guaranteed that the selected mode will be a full sensor mode, leading to a potential cropping of the picture.
 
 Example: When configuring a 640x480 output stream on a Raspberry Pi Camera Module v2, libcamera will automatically choose a heavily cropped 640x480 sensor mode, leading to a digital zoom of ~2.5x.
 
