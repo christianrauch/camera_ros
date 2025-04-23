@@ -1,5 +1,6 @@
 #include "ParameterHandler.hpp"
 #include "format_mapping.hpp"
+#include "libcamera_version_utils.hpp"
 #include "pretty_print.hpp"
 #include <algorithm>
 #include <camera_info_manager/camera_info_manager.hpp>
@@ -258,6 +259,19 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   param_descr_sensor_mode.read_only = true;
   const libcamera::Size sensor_size = get_sensor_format(declare_parameter<std::string>("sensor_mode", {}, param_descr_sensor_mode));
 
+#if LIBCAMERA_VER_GE(0, 2, 0)
+  rcl_interfaces::msg::ParameterDescriptor param_descr_orientation;
+  param_descr_orientation.description = "camera orientation";
+  rcl_interfaces::msg::IntegerRange orientation_range;
+  orientation_range.from_value = 0;
+  orientation_range.to_value = 270;
+  orientation_range.step = 90;
+  param_descr_orientation.integer_range.push_back(orientation_range);
+  param_descr_orientation.read_only = true;
+  const libcamera::Orientation orientation = libcamera::orientationFromRotation(
+    declare_parameter<int>("orientation", 0, param_descr_orientation));
+#endif
+
   // camera info file url
   rcl_interfaces::msg::ParameterDescriptor param_descr_camera_info_url;
   param_descr_camera_info_url.description = "camera calibration info file url";
@@ -351,6 +365,10 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   if (!cfg || cfg->size() != roles.size())
     throw std::runtime_error("failed to generate configuration for all roles");
 
+#if LIBCAMERA_VER_GE(0, 2, 0)
+  cfg->orientation = orientation;
+#endif
+
   libcamera::StreamConfiguration &scfg = cfg->at(0);
 
   // list all camera formats, including those not supported by the ROS message
@@ -414,9 +432,18 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   case libcamera::CameraConfiguration::Valid:
     break;
   case libcamera::CameraConfiguration::Adjusted:
+#if LIBCAMERA_VER_GE(0, 2, 0)
+    RCLCPP_WARN_STREAM(get_logger(), "stream configuration adjusted from \""
+                                       << selected_scfg.toString() << "\" (" << orientation << ") to \"" << scfg.toString()
+                                       << "\" (" << cfg->orientation << ")");
+    if (cfg->orientation != orientation) {
+      RCLCPP_WARN_STREAM(get_logger(), "cannot set orientation to " << orientation);
+    }
+#else
     RCLCPP_WARN_STREAM(get_logger(), "stream configuration adjusted from \""
                                        << selected_scfg.toString() << "\" to \"" << scfg.toString()
                                        << "\"");
+#endif
     break;
   case libcamera::CameraConfiguration::Invalid:
     throw std::runtime_error("failed to validate stream configurations");
