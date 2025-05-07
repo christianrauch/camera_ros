@@ -124,7 +124,7 @@ The camera stream is configured once when the node starts via the following stat
 | `format`          | `string`              | a `PixelFormat` that is supported by the camera [default: auto]                                                             |
 | `width`, `height` | `integer`             | desired image resolution [default: auto]                                                                                    |
 | `sensor_mode`     | `string`              | desired raw sensor format resolution (format: `width:height`) [default: auto]                                               |
-| `orientation`     | `integer`             | camera orientation in 90 degree steps (possible choices: `0`, `90`, `180`, `270`) [default: `0`]                     |
+| `orientation`     | `integer`             | camera orientation in 90 degree steps (possible choices: `0`, `90`, `180`, `270`) [default: `0`]                            |
 | `camera_info_url` | `string`              | URL for a camera calibration YAML file (see [Calibration](#calibration)) [default: `~/.ros/camera_info/$NAME.yaml`]         |
 
 
