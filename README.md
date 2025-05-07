@@ -181,7 +181,7 @@ colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug
 ```
 and then run the node with libcamera and ROS debug information in `gdb`:
 ```sh
-LIBCAMERA_LOG_LEVELS=*:DEBUG ros2 run --prefix 'gdb -ex run --args' camera_ros camera_node --ros-args --log-level camera:=debug -p width:=640 -p height:=480
+LIBCAMERA_LOG_LEVELS=*:DEBUG ros2 run --prefix "gdb -ex 'set pagination off' -ex run -ex backtrace --args" camera_ros camera_node --ros-args --log-level camera:=debug
 ```
 
 
