@@ -124,7 +124,7 @@ The camera stream is configured once when the node starts via the following stat
 | `format`          | `string`              | a `PixelFormat` that is supported by the camera [default: auto]                                                             |
 | `width`, `height` | `integer`             | desired image resolution [default: auto]                                                                                    |
 | `sensor_mode`     | `string`              | desired raw sensor format resolution (format: `width:height`) [default: auto]                                               |
-| `orientation`     | `integer`             | camera orientation in 90 degree steps (possible choices: `0`, `90`, `180`, `270`) [default: `0`]                     |
+| `orientation`     | `integer`             | camera orientation in 90 degree steps (possible choices: `0`, `90`, `180`, `270`) [default: `0`]                            |
 | `camera_info_url` | `string`              | URL for a camera calibration YAML file (see [Calibration](#calibration)) [default: `~/.ros/camera_info/$NAME.yaml`]         |
 
 
@@ -175,13 +175,20 @@ To calibrate the camera and set the parameters, you can use the [`cameracalibrat
 
 ## Trouble Shooting
 
-To debug the node, first compile it in `Debug` mode:
+To debug the node with `gdb`, you have to make the debug symbols available:
+- **binary:** If you are using the binary bloom package (`ros-$ROS_DISTRO-camera-ros`), you also have to install the `dbgsym` packages:
+  ```sh
+  sudo apt install ros-$ROS_DISTRO-libcamera-dbgsym ros-$ROS_DISTRO-camera-ros-dbgsym
+  ```
+
+- **source:** If you are compiling from source, you have to set the build type to `Debug`:
+  ```sh
+  colcon build --cmake-args -D CMAKE_BUILD_TYPE=Debug
+  ```
+
+Then, once the debug symbols are available, run the node with libcamera and ROS debug information in `gdb` and generate a backtrace:
 ```sh
-colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug
-```
-and then run the node with libcamera and ROS debug information in `gdb`:
-```sh
-LIBCAMERA_LOG_LEVELS=*:DEBUG ros2 run --prefix 'gdb -ex run --args' camera_ros camera_node --ros-args --log-level camera:=debug -p width:=640 -p height:=480
+LIBCAMERA_LOG_LEVELS=*:DEBUG ros2 run --prefix "gdb -ex 'set pagination off' -ex run -ex backtrace --args" camera_ros camera_node --ros-args --log-level camera:=debug
 ```
 
 
