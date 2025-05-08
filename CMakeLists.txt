@@ -30,9 +30,10 @@ add_library(utils OBJECT
   src/pretty_print.cpp
 )
 target_include_directories(utils PUBLIC ${libcamera_INCLUDE_DIRS})
-target_link_libraries(utils ${libcamera_LINK_LIBRARIES}
-  PUBLIC
-  "sensor_msgs"
+target_link_libraries(utils PUBLIC
+  ${libcamera_LINK_LIBRARIES}
+  ${sensor_msgs_TARGETS}
+  sensor_msgs::sensor_msgs_library
 )
 set_property(TARGET utils PROPERTY POSITION_INDEPENDENT_CODE ON)
 
@@ -47,9 +48,9 @@ add_library(param OBJECT
     src/ParameterConflictHandler.cpp
 )
 target_include_directories(param PUBLIC ${libcamera_INCLUDE_DIRS})
-target_link_libraries(param ${libcamera_LINK_LIBRARIES}
-  PUBLIC
-  "rclcpp"
+target_link_libraries(param PUBLIC
+  ${libcamera_LINK_LIBRARIES}
+  rclcpp::rclcpp
 )
 set_property(TARGET param PROPERTY POSITION_INDEPENDENT_CODE ON)
 
@@ -64,7 +65,7 @@ set(PACKAGE_DEPENDENCIES
   "cv_bridge"
 )
 target_include_directories(camera_component PUBLIC ${libcamera_INCLUDE_DIRS})
-target_link_libraries(camera_component PUBLIC ${PACKAGE_DEPENDENCIES} ${libcamera_LINK_LIBRARIES})
+target_link_libraries(camera_component PUBLIC ${libcamera_LINK_LIBRARIES} ${sensor_msgs_TARGETS} camera_info_manager::camera_info_manager cv_bridge::cv_bridge rclcpp::rclcpp rclcpp_components::component rclcpp_components::component_manager sensor_msgs::sensor_msgs_library)
 target_link_libraries(camera_component PRIVATE utils param)
 
 ament_export_targets(camera_componentTargets HAS_LIBRARY_TARGET)
