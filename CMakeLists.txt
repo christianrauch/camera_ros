@@ -30,8 +30,7 @@ add_library(utils OBJECT
   src/pretty_print.cpp
 )
 target_include_directories(utils PUBLIC ${libcamera_INCLUDE_DIRS})
-target_link_libraries(utils ${libcamera_LINK_LIBRARIES})
-target_link_libraries(utils
+target_link_libraries(utils ${libcamera_LINK_LIBRARIES}
   PUBLIC
   "sensor_msgs"
 )
@@ -48,8 +47,7 @@ add_library(param OBJECT
     src/ParameterConflictHandler.cpp
 )
 target_include_directories(param PUBLIC ${libcamera_INCLUDE_DIRS})
-target_link_libraries(param ${libcamera_LINK_LIBRARIES})
-target_link_libraries(param
+target_link_libraries(param ${libcamera_LINK_LIBRARIES}
   PUBLIC
   "rclcpp"
 )
@@ -65,9 +63,8 @@ set(PACKAGE_DEPENDENCIES
   "camera_info_manager"
   "cv_bridge"
 )
-target_link_libraries(camera_component PUBLIC ${PACKAGE_DEPENDENCIES})
 target_include_directories(camera_component PUBLIC ${libcamera_INCLUDE_DIRS})
-target_link_libraries(camera_component PUBLIC ${libcamera_LINK_LIBRARIES})
+target_link_libraries(camera_component PUBLIC ${PACKAGE_DEPENDENCIES} ${libcamera_LINK_LIBRARIES})
 target_link_libraries(camera_component PRIVATE utils param)
 
 ament_export_targets(camera_componentTargets HAS_LIBRARY_TARGET)
