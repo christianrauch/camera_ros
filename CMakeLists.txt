@@ -31,8 +31,8 @@ add_library(utils OBJECT
 )
 target_include_directories(utils PUBLIC ${libcamera_INCLUDE_DIRS})
 target_link_libraries(utils ${libcamera_LINK_LIBRARIES})
-ament_target_dependencies(
-  utils
+target_link_libraries(utils
+  PUBLIC
   "sensor_msgs"
 )
 set_property(TARGET utils PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -49,8 +49,8 @@ add_library(param OBJECT
 )
 target_include_directories(param PUBLIC ${libcamera_INCLUDE_DIRS})
 target_link_libraries(param ${libcamera_LINK_LIBRARIES})
-ament_target_dependencies(
-  param
+target_link_libraries(param
+  PUBLIC
   "rclcpp"
 )
 set_property(TARGET param PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -65,7 +65,7 @@ set(PACKAGE_DEPENDENCIES
   "camera_info_manager"
   "cv_bridge"
 )
-ament_target_dependencies(camera_component PUBLIC ${PACKAGE_DEPENDENCIES})
+target_link_libraries(camera_component PUBLIC ${PACKAGE_DEPENDENCIES})
 target_include_directories(camera_component PUBLIC ${libcamera_INCLUDE_DIRS})
 target_link_libraries(camera_component PUBLIC ${libcamera_LINK_LIBRARIES})
 target_link_libraries(camera_component PRIVATE utils param)
