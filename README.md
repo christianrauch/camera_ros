@@ -176,22 +176,47 @@ To calibrate the camera and set the parameters, you can use the [`cameracalibrat
 
 ## Trouble Shooting
 
-To debug the node with `gdb`, you have to make the debug symbols available:
-- **binary:** If you are using the binary bloom package (`ros-$ROS_DISTRO-camera-ros`), you also have to install the `dbgsym` packages:
-  ```sh
-  sudo apt install ros-$ROS_DISTRO-libcamera-dbgsym ros-$ROS_DISTRO-camera-ros-dbgsym
-  ```
+### Log Verbosity
 
-- **source:** If you are compiling from source, you have to set the build type to `Debug`:
-  ```sh
-  colcon build --cmake-args -D CMAKE_BUILD_TYPE=Debug
-  ```
-
-Then, once the debug symbols are available, run the node with libcamera and ROS debug information in `gdb` and generate a backtrace:
+More verbose logging can be enabled by setting the libcamera and node log levels:
 ```sh
-LIBCAMERA_LOG_LEVELS=*:DEBUG ros2 run --prefix "gdb -ex 'set pagination off' -ex run -ex backtrace --args" camera_ros camera_node --ros-args --log-level camera:=debug
+LIBCAMERA_LOG_LEVELS=*:DEBUG ros2 run camera_ros camera_node --ros-args --log-level camera:=debug
 ```
 
+### Debugging: Preparation
+
+1. To debug the node with `gdb`, you have to make the debug symbols available:
+    - **binary:** If you are using the binary bloom package (`ros-$ROS_DISTRO-camera-ros`), you also have to install the `dbgsym` packages:
+        ```sh
+        sudo apt install ros-$ROS_DISTRO-libcamera-dbgsym ros-$ROS_DISTRO-camera-ros-dbgsym
+        ```
+    - **source:** If you are compiling from source, you have to set the build type to `Debug`:
+        ```sh
+        colcon build --cmake-args -D CMAKE_BUILD_TYPE=Debug
+        ```
+
+2. Enable core dumps (a.k.a. "core files"):
+    ```sh
+    sudo sysctl -w kernel.core_pattern=/tmp/%e-%t.core
+    ulimit -c unlimited
+    ```
+
+### Debugging: Crash Reports
+
+To provide more information about a crash, generate a core dump or a backtrace with `gdb`. A core dump provides the full memory image of the process and is the best way to debug a process after it crashed. It can also be used to generate a backtrace.
+
+> [!IMPORTANT]
+> The core dump and backtrace contains references to the source code. Therefore, when providing either, you also have to mention for which git tag or commit hash this was generated.
+
+#### core dump
+If core dumps have been enabled, they will be generated automatically at `/tmp/camera_node-$TIME.core` (`$TIME` is seconds since the epoch). Make sure that you ran `ulimit -c unlimited` in the terminal and then reproduce the crash (`ros2 run camera_ros camera_node`), compress the core dump file (`gzip /tmp/camera_node-$TIME.core`), and share the compressed `/tmp/camera_node-$TIME.core.gz` for post-mortem debugging.
+
+#### backtrace
+Run the node and reprduce the crash with `--prefix` set:
+```sh
+LIBCAMERA_LOG_LEVELS=*:DEBUG ros2 run --prefix "gdb -ex='set pagination off' -ex=run -ex=backtrace --args" camera_ros camera_node --ros-args --log-level camera:=debug
+```
+If the process crashes, the backtrace will be shown. Paste the full `stdout` output, including the debug logs and backtrace, in a issue.
 
 ### Common Issues
 
