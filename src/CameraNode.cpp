@@ -105,6 +105,7 @@ private:
   camera_info_manager::CameraInfoManager cim;
 
   ParameterHandler parameter_handler;
+  std::string frame_id;
 
 #ifdef RCLCPP_HAS_PARAM_EXT_CB
   // use new "post_set" callback to apply parameters
@@ -258,6 +259,9 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   param_descr_sensor_mode.additional_constraints = "string in format [width]:[height]";
   param_descr_sensor_mode.read_only = true;
   const libcamera::Size sensor_size = get_sensor_format(declare_parameter<std::string>("sensor_mode", {}, param_descr_sensor_mode));
+
+  // camera frame_id
+  frame_id = declare_parameter<std::string>("frame_id", "camera", param_descr_ro);
 
 #if LIBCAMERA_VER_GE(0, 2, 0)
   rcl_interfaces::msg::ParameterDescriptor param_descr_orientation;
@@ -617,7 +621,7 @@ CameraNode::process(libcamera::Request *const request)
       // send image data
       std_msgs::msg::Header hdr;
       hdr.stamp = rclcpp::Time(time_offset + int64_t(metadata.timestamp));
-      hdr.frame_id = "camera";
+      hdr.frame_id = frame_id;
       const libcamera::StreamConfiguration &cfg = stream->configuration();
 
       auto msg_img = std::make_unique<sensor_msgs::msg::Image>();
