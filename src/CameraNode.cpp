@@ -640,9 +640,9 @@ CameraNode::process(libcamera::Request *const request)
       RCLCPP_DEBUG_STREAM(
         get_logger(),
         "offset: " << std::to_string(time_offset) << " ns, frame_time: "
-           << std::to_string(frame_time.nanoseconds()) << " ns, latency: "
-           << std::to_string(this->now().nanoseconds() - (sensor_ts.value() + time_offset))
-           << " ns");
+                   << std::to_string(frame_time.nanoseconds()) << " ns, latency: "
+                   << std::to_string(this->now().nanoseconds() - (sensor_ts.value() + time_offset))
+                   << " ns");
 
       // send image data
       std_msgs::msg::Header hdr;
