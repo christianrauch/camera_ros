@@ -97,6 +97,8 @@ private:
 
   // timestamp offset (ns) from camera time to system time
   int64_t time_offset = 0;
+  std::atomic<unsigned int> last_sequence = 0;
+  std::atomic<uint64_t> last_timestamp = 0;
 
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_image;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr pub_image_compressed;
@@ -617,6 +619,16 @@ CameraNode::process(libcamera::Request *const request)
       // set time offset once for accurate timing using the device time
       if (time_offset == 0)
         time_offset = this->now().nanoseconds() - metadata.timestamp;
+
+      if (metadata.sequence > 0) {
+        assert(metadata.sequence > last_sequence);
+        const unsigned int dropped_frames = (metadata.sequence - last_sequence) - 1;
+        if (dropped_frames)
+          RCLCPP_WARN_STREAM(get_logger(), "Dropped " << dropped_frames << " frames! Last frame was " << (metadata.timestamp - last_timestamp) * 1e-6 << " ms ago.");
+      }
+
+      last_sequence = metadata.sequence;
+      last_timestamp = metadata.timestamp;
 
       // send image data
       std_msgs::msg::Header hdr;
