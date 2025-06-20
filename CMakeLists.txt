@@ -8,15 +8,20 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_link_options("-Wl,-z,relro,-z,now,-z,defs")
 endif()
 
+find_package(ament_cmake REQUIRED)
 find_package(PkgConfig REQUIRED)
 
 # find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(rclcpp_components REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(camera_info_manager REQUIRED)
-find_package(cv_bridge REQUIRED)
+set(PACKAGE_DEPENDENCIES
+  "rclcpp"
+  "rclcpp_components"
+  "sensor_msgs"
+  "camera_info_manager"
+  "cv_bridge"
+)
+foreach(PKGDEP IN LISTS PACKAGE_DEPENDENCIES)
+  find_package(${PKGDEP} REQUIRED)
+endforeach()
 pkg_check_modules(libcamera REQUIRED libcamera>=0.1)
 
 # new param callbacks need at least 17.0.0
@@ -58,14 +63,13 @@ set_property(TARGET param PROPERTY POSITION_INDEPENDENT_CODE ON)
 # composable ROS2 node
 add_library(camera_component SHARED src/CameraNode.cpp)
 rclcpp_components_register_node(camera_component PLUGIN "camera::CameraNode" EXECUTABLE "camera_node")
-set(PACKAGE_DEPENDENCIES
+target_link_libraries(camera_component PUBLIC
   rclcpp::rclcpp
   rclcpp_components::component
   ${sensor_msgs_TARGETS}
   camera_info_manager::camera_info_manager
   cv_bridge::cv_bridge
 )
-target_link_libraries(camera_component PUBLIC ${PACKAGE_DEPENDENCIES})
 target_include_directories(camera_component PUBLIC ${libcamera_INCLUDE_DIRS})
 target_link_libraries(camera_component PUBLIC ${libcamera_LINK_LIBRARIES})
 target_link_libraries(camera_component PRIVATE utils param)
