@@ -77,7 +77,6 @@ public:
 
   enum class TimestampSource
   {
-    LIBCAMERA,
     SENSOR_TIMESTAMP,
     NODE
   };
