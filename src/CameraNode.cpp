@@ -199,7 +199,6 @@ get_timestamp_source(const std::string &str)
   static const std::unordered_map<std::string, camera::CameraNode::TimestampSource> source_map = {
     {"sensor", camera::CameraNode::TimestampSource::SENSOR_TIMESTAMP},
     {"node", camera::CameraNode::TimestampSource::NODE},
-    {"libcamera", camera::CameraNode::TimestampSource::LIBCAMERA},
   };
 
   try {
@@ -332,10 +331,22 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   // timestamp_source parameter
   rcl_interfaces::msg::ParameterDescriptor param_descr_timestamp_source;
   param_descr_timestamp_source.description = "source of timestamp for image messages";
-  param_descr_timestamp_source.additional_constraints = "one of {libcamera, sensor, node}";
+  param_descr_timestamp_source.additional_constraints = "one of {sensor, node}";
   param_descr_timestamp_source.read_only = true;
   timestamp_source = get_timestamp_source(declare_parameter<std::string>(
-    "timestamp_source", "libcamera", param_descr_timestamp_source));
+    "timestamp_source", "sensor", param_descr_timestamp_source));
+  if (timestamp_source == TimestampSource::SENSOR_TIMESTAMP) {
+    struct timespec ts_boottime, ts_realtime;
+    if (clock_gettime(CLOCK_BOOTTIME, &ts_boottime) == 0 &&
+        clock_gettime(CLOCK_REALTIME, &ts_realtime) == 0) {
+      auto uptime = std::chrono::seconds(ts_boottime.tv_sec) + std::chrono::nanoseconds(ts_boottime.tv_nsec);
+      auto now = std::chrono::seconds(ts_realtime.tv_sec) + std::chrono::nanoseconds(ts_realtime.tv_nsec);
+      time_offset = (now - uptime).count();
+    }
+    else {
+      throw std::runtime_error("getting time failed: " + std::string(std::strerror(errno)));
+    }
+  }
 
   // publisher for raw and compressed image
   pub_image = this->create_publisher<sensor_msgs::msg::Image>("~/image_raw", 1);
@@ -655,20 +666,6 @@ CameraNode::process(libcamera::Request *const request)
       if (timestamp_source == TimestampSource::SENSOR_TIMESTAMP) {
         auto sensor_ts = req_metadata.get(libcamera::controls::SensorTimestamp);
         if (sensor_ts) {
-          if (time_offset == 0) {
-            struct timespec ts_boottime, ts_realtime;
-            if (clock_gettime(CLOCK_BOOTTIME, &ts_boottime) == 0 &&
-                clock_gettime(CLOCK_REALTIME, &ts_realtime) == 0) {
-              auto uptime = std::chrono::seconds(ts_boottime.tv_sec) + std::chrono::nanoseconds(ts_boottime.tv_nsec);
-              auto now = std::chrono::seconds(ts_realtime.tv_sec) + std::chrono::nanoseconds(ts_realtime.tv_nsec);
-              time_offset = (now - uptime).count();
-            }
-            else {
-              RCLCPP_WARN_STREAM(get_logger(), "failed to get CLOCK_BOOTTIME or CLOCK_REALTIME, falling back to NODE time as reference");
-              timestamp_source = TimestampSource::NODE;
-              frame_time = this->now();
-            }
-          }
           frame_time = rclcpp::Time(req_metadata.get(libcamera::controls::SensorTimestamp).value() + time_offset);
         }
         else {
@@ -683,13 +680,8 @@ CameraNode::process(libcamera::Request *const request)
                      << std::to_string(this->now().nanoseconds() - (sensor_ts.value() + time_offset))
                      << " ns");
       }
-      else if (timestamp_source == TimestampSource::NODE) {
-        frame_time = this->now();
-      }
       else {
-        if (time_offset == 0)
-          time_offset = this->now().nanoseconds() - metadata.timestamp;
-        frame_time = rclcpp::Time(time_offset + int64_t(metadata.timestamp));
+        frame_time = this->now();
       }
 
       if (metadata.sequence > 0) {
