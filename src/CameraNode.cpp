@@ -99,6 +99,7 @@ private:
   int64_t time_offset = 0;
   std::atomic<unsigned int> last_sequence = 0;
   std::atomic<uint64_t> last_timestamp = 0;
+  int64_t system_boot_time = 0;
 
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_image;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr pub_image_compressed;
@@ -309,6 +310,19 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   pub_image_compressed =
     this->create_publisher<sensor_msgs::msg::CompressedImage>("~/image_raw/compressed", 1);
   pub_ci = this->create_publisher<sensor_msgs::msg::CameraInfo>("~/camera_info", 1);
+
+  // system boot time
+  struct timespec ts_boottime;
+  // clock_gettime(CLOCK_BOOTTIME, &ts_boottime);
+  clock_gettime(CLOCK_MONOTONIC, &ts_boottime);
+  auto runtime = ts_boottime.tv_sec * 1'000'000'000 + ts_boottime.tv_nsec;
+  system_boot_time = this->now().nanoseconds() - runtime;
+
+  RCLCPP_WARN_STREAM(get_logger(),
+                     std::endl
+                     << "wall " << std::setfill('0') << std::setw(20) << this->now().nanoseconds() << std::endl
+                     << "boot " << std::setfill('0') << std::setw(20) << runtime << std::endl
+                     << "sbot " << std::setfill('0') << std::setw(20) << system_boot_time);
 
   // start camera manager and check for cameras
   camera_manager.start();
@@ -620,6 +634,23 @@ CameraNode::process(libcamera::Request *const request)
       if (time_offset == 0)
         time_offset = this->now().nanoseconds() - metadata.timestamp;
 
+      const libcamera::ControlList &req_metadata = request->metadata();
+      // The timestamp, expressed in nanoseconds, represents a monotonically increasing counter since the system boot time, as defined by the Linux-specific CLOCK_BOOTTIME clock id.
+      const int64_t sensor_ts = req_metadata.get(libcamera::controls::SensorTimestamp).value();
+
+      struct timespec ts_boottime;
+      clock_gettime(CLOCK_MONOTONIC, &ts_boottime);
+      auto uptime = ts_boottime.tv_sec * 1'000'000'000 + ts_boottime.tv_nsec;
+      const int64_t sbt = this->now().nanoseconds() - uptime;
+
+
+      RCLCPP_WARN_STREAM(get_logger(), std::endl
+                         << "wall " << this->now().nanoseconds() << std::endl
+                         << "sens " << sbt + sensor_ts);
+      // RCLCPP_WARN_STREAM(get_logger(), "boot " << ts_boottime.tv_sec/(24 * 3600) << ":" << (ts_boottime.tv_sec%(24 * 3600))/3600);
+      // RCLCPP_WARN_STREAM(get_logger(), "sens " << sensor_ts/(24 * 3600) << ":" << (sensor_ts%(24 * 3600))/3600);
+      RCLCPP_WARN_STREAM(get_logger(), "diff " << (this->now().nanoseconds() - (sbt + sensor_ts)) / 1'000'000);
+
       if (metadata.sequence > 0) {
         assert(metadata.sequence > last_sequence);
         const unsigned int dropped_frames = (metadata.sequence - last_sequence) - 1;
@@ -632,7 +663,8 @@ CameraNode::process(libcamera::Request *const request)
 
       // send image data
       std_msgs::msg::Header hdr;
-      hdr.stamp = rclcpp::Time(time_offset + int64_t(metadata.timestamp));
+      // hdr.stamp = rclcpp::Time(time_offset + int64_t(metadata.timestamp));
+      hdr.stamp = rclcpp::Time(sbt + sensor_ts);
       hdr.frame_id = frame_id;
       const libcamera::StreamConfiguration &cfg = stream->configuration();
 
