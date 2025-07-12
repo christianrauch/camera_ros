@@ -265,7 +265,6 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   // camera frame_id
   frame_id = declare_parameter<std::string>("frame_id", "camera", param_descr_ro);
 
-#if LIBCAMERA_VER_GE(0, 2, 0)
   rcl_interfaces::msg::ParameterDescriptor param_descr_orientation;
   param_descr_orientation.description = "camera orientation";
   rcl_interfaces::msg::IntegerRange orientation_range;
@@ -274,8 +273,14 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   orientation_range.step = 90;
   param_descr_orientation.integer_range.push_back(orientation_range);
   param_descr_orientation.read_only = true;
-  const libcamera::Orientation orientation = libcamera::orientationFromRotation(
-    declare_parameter<int>("orientation", 0, param_descr_orientation));
+  constexpr int orientation_angle_default = 0;
+  const int angle = declare_parameter<int>("orientation", orientation_angle_default, param_descr_orientation);
+#if LIBCAMERA_VER_GE(0, 2, 0)
+  const libcamera::Orientation orientation = libcamera::orientationFromRotation(angle);
+#else
+  if (angle != orientation_angle_default) {
+    RCLCPP_WARN_STREAM(get_logger(), "parameter 'orientation' not supported on libcamera " << LIBCAMERA_VERSION_MAJOR << "." << LIBCAMERA_VERSION_MINOR);
+  }
 #endif
 
   // camera info file url
