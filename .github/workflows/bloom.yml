@@ -1,0 +1,61 @@
+name: bloom
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: "${{ matrix.distribution }} (${{ matrix.ros }})"
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - {distribution: ubuntu,    version: 22.04, ros: humble}
+          - {distribution: ubuntu,    version: 24.04, ros: jazzy}
+          - {distribution: almalinux, version: 8,     ros: humble}
+          - {distribution: almalinux, version: 9,     ros: jazzy}
+
+    container:
+      image: ${{ matrix.distribution }}:${{ matrix.version }}
+
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      PIP_BREAK_SYSTEM_PACKAGES: 1
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ros-tooling/setup-ros@v0.7
+
+      - name: install build tool dependencies (ubuntu)
+        if: ${{ matrix.distribution == 'ubuntu' }}
+        run: |
+          apt install -y --no-install-recommends devscripts equivs
+
+      - name: install build tool dependencies (almalinux)
+        if: ${{ matrix.distribution == 'almalinux' }}
+        run: |
+          dnf install -y python3-mypy clang-tools-extra
+
+      - name: install bloom
+        run: pip3 install -U bloom
+
+      - name: bloom (ubuntu)
+        if: ${{ matrix.distribution == 'ubuntu' }}
+        run: |
+          rosdep update
+          bloom-generate rosdebian --ros-distro ${{ matrix.ros }}
+          mk-build-deps
+          apt install -y --no-install-recommends ./ros-${{ matrix.ros }}-camera-ros-build-deps_*_all.deb
+          dpkg-buildpackage -b
+          apt install -y --no-install-recommends ../ros-${{ matrix.ros }}-camera-ros_*.deb ../ros-${{ matrix.ros }}-camera-ros-dbgsym_*.ddeb
+
+      - name: bloom (almalinux)
+        if: ${{ matrix.distribution == 'almalinux'}}
+        run: |
+          rosdep update
+          bloom-generate rosrpm --ros-distro ${{ matrix.ros }}
+          dnf builddep -y rpm/template.spec
+          rpmbuild -bb --build-in-place rpm/template.spec
+          dnf install -y /github/home/rpmbuild/RPMS/*/ros-${{ matrix.ros }}-camera-ros-*.rpm
