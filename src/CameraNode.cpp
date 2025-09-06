@@ -222,7 +222,19 @@ compressImageMsg(const sensor_msgs::msg::Image &source,
 
 CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     : Node("camera", options),
+#if CIM_HAS_NODE_INTERFACE
+      cim(
+        this->get_node_base_interface(),
+        this->get_node_services_interface(),
+        this->get_node_logging_interface()
+#if CIM_HAS_QoS
+          ,
+        "camera", {}, rclcpp::SystemDefaultsQoS()
+#endif
+          ),
+#else
       cim(this),
+#endif
       parameter_handler(this),
       param_cb_change(
 #ifdef RCLCPP_HAS_PARAM_EXT_CB
