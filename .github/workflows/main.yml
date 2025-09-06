@@ -15,8 +15,10 @@ jobs:
         include:
           - {distribution: ubuntu,    version: 22.04, ros: humble}
           - {distribution: ubuntu,    version: 24.04, ros: jazzy}
+          - {distribution: ubuntu,    version: 24.04, ros: rolling}
           - {distribution: almalinux, version: 8,     ros: humble}
           - {distribution: almalinux, version: 9,     ros: jazzy}
+          - {distribution: almalinux, version: 9,     ros: rolling}
 
     continue-on-error: ${{ matrix.ros == 'rolling' }}
 
