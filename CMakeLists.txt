@@ -29,6 +29,16 @@ if(${rclcpp_VERSION} VERSION_GREATER_EQUAL "17")
     add_compile_definitions(RCLCPP_HAS_PARAM_EXT_CB)
 endif()
 
+# "CameraInfoManager" constructor
+#  - with "NodeBaseInterface" only available from 4.1 onwards
+#  - overloaded with "rclcpp::QoS" from 6.3 onward
+if(${camera_info_manager_VERSION} VERSION_GREATER_EQUAL "4.1")
+    add_compile_definitions(CIM_HAS_NODE_INTERFACE)
+endif()
+if(${camera_info_manager_VERSION} VERSION_GREATER_EQUAL "6.3")
+    add_compile_definitions(CIM_HAS_QoS)
+endif()
+
 # library with common utility functions for type conversions
 add_library(utils OBJECT
   src/format_mapping.cpp
