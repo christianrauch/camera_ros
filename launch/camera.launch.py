@@ -55,7 +55,6 @@ def generate_launch_description() -> LaunchDescription:
             }],
             extra_arguments=[{'use_intra_process_comms': True}],
         ),
-
     ]
 
     # optionally add ImageViewNode to show camera image
