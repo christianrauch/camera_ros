@@ -74,6 +74,12 @@ cv_to_pv_scalar(const uint32_t &val)
 }
 
 rclcpp::ParameterValue
+cv_to_pv_scalar(const std::string_view &val)
+{
+  return rclcpp::ParameterValue(static_cast<std::string>(val));
+}
+
+rclcpp::ParameterValue
 cv_to_pv_scalar(const libcamera::Rectangle &rectangle)
 {
   return rclcpp::ParameterValue(
