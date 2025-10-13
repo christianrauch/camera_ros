@@ -29,10 +29,32 @@ jobs:
       - name: install ROS 2
         uses: ros-tooling/setup-ros@v0.7
 
+      - name: build and test dependencies (ubuntu)
+        if: ${{ matrix.distribution == 'ubuntu'}}
+        run: |
+          apt -y install --no-install-recommends python3-pip ninja-build
+          apt -y purge meson
+
       - name: build and test dependencies (almalinux)
         if: ${{ matrix.distribution == 'almalinux'}}
         run: |
-          dnf -y install libasan python3-mypy
+          dnf -y install libasan python3-mypy python3-pip ninja-build
+
+      - name: install colcon-meson
+        env:
+          PIP_BREAK_SYSTEM_PACKAGES: 1
+        run: |
+          pip3 install colcon-meson meson>=0.63
+
+      - name: install libcamera dependencies (ubuntu)
+        if: ${{ matrix.distribution == 'ubuntu'}}
+        run: |
+          apt -y install --no-install-recommends libyaml-dev python3-yaml python3-ply python3-jinja2
+
+      - name: install libcamera dependencies (almalinux)
+        if: ${{ matrix.distribution == 'almalinux'}}
+        run: |
+          dnf -y install libyaml-devel python3-yaml python3-ply python3-jinja2
 
       - name: setup rosdep
         run: |
@@ -43,9 +65,16 @@ jobs:
           colcon mixin add default https://raw.githubusercontent.com/colcon/colcon-mixin-repository/master/index.yaml
           colcon mixin update default
 
-      - uses: actions/checkout@v4
+      - run: |
+          git clone https://git.libcamera.org/libcamera/libcamera.git -b v0.5.2 src/libcamera
+
+      - uses: actions/checkout@v5
         with:
-          path: src
+          path: src/camera_ros
+
+      - name: list packages in workspace
+        run: |
+          colcon list
 
       - name: build and test
         run: |
@@ -53,6 +82,12 @@ jobs:
           . /opt/ros/${{ matrix.ros }}/setup.sh
           colcon build \
             --event-handlers=console_cohesion+ \
+            --meson-args "--auto-features=disabled" "-Dipas=[]" "-Dpipelines=[]" \
+            --packages-up-to libcamera
+          colcon build \
+            --event-handlers=console_cohesion+ \
             --mixin asan-gcc tsan coverage-gcc memcheck \
             --packages-up-to camera_ros
-          colcon test --return-code-on-test-failure --event-handlers=console_cohesion+
+          colcon test --return-code-on-test-failure \
+            --event-handlers=console_cohesion+ \
+            --packages-select camera_ros
