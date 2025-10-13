@@ -15,12 +15,6 @@ public:
   explicit should_not_reach() : std::runtime_error("should not reach here") {}
 };
 
-class unknown_control : public std::runtime_error
-{
-public:
-  explicit unknown_control(const libcamera::ControlId *const id) : std::runtime_error("unknown control: " + id->name() + " (" + std::to_string(id->id()) + ")") {}
-};
-
 class unsupported_control : public std::runtime_error
 {
 public:
