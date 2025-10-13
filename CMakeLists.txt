@@ -58,7 +58,6 @@ add_library(param OBJECT
     src/cv_to_pv.cpp
     src/pv_to_cv.cpp
     src/types.cpp
-    src/type_extent.cpp
     src/ParameterHandler.cpp
     src/ParameterConflictHandler.cpp
 )

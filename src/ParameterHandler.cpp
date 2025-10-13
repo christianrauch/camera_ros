@@ -2,7 +2,6 @@
 #include "clamp.hpp"
 #include "cv_to_pv.hpp"
 #include "pv_to_cv.hpp"
-#include "type_extent.hpp"
 #include "types.hpp"
 #include <cstddef>
 #include <libcamera/base/span.h>
@@ -90,15 +89,9 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
 
     // check if the control can be mapped to a parameter
     rclcpp::ParameterType pv_type;
-    std::size_t extent;
+    const std::size_t size = id->size();
     try {
       pv_type = cv_to_pv_type(id);
-      extent = get_extent(id);
-    }
-    catch (const unknown_control &e) {
-      // ignore not yet handled control
-      RCLCPP_WARN_STREAM(node->get_logger(), e.what());
-      continue;
     }
     catch (const unsupported_control &e) {
       // ignore control which cannot be supported
@@ -106,8 +99,8 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
       continue;
     }
 
-    const bool ctrl_scalar = (extent == 0);
-    const bool ctrl_dynamic = (extent == libcamera::dynamic_extent);
+    const bool ctrl_scalar = (size == 0);
+    const bool ctrl_dynamic = (size == libcamera::dynamic_extent);
     const bool ctrl_fixed = !(ctrl_scalar || ctrl_dynamic);
 
     if (ctrl_fixed && !cv_def.isArray() && !cv_def.isNone()) {
@@ -115,7 +108,7 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
         node->get_logger(),
         id->name()
           << ": cannot set default scalar value '" << cv_def.toString() << "' "
-          << "on span control (extend: " << extent << "), default will be ignored");
+          << "on span control (extend: " << size << "), default will be ignored");
       cv_def = {};
     }
 
@@ -125,7 +118,7 @@ ParameterHandler::declare(const libcamera::ControlInfoMap &controls)
     descriptor.type = pv_type;
     descriptor.dynamic_typing = true;
     const std::string cv_type_descr =
-      ctrl_scalar ? "scalar" : "array[" + (ctrl_dynamic ? std::string() : std::to_string(extent)) + "]";
+      ctrl_scalar ? "scalar" : "array[" + (ctrl_dynamic ? std::string() : std::to_string(size)) + "]";
     descriptor.description =
       std::to_string(id->type()) + " " + cv_type_descr + " range {" + info.min().toString() +
       "}..{" + info.max().toString() + "}" +
@@ -359,14 +352,14 @@ ParameterHandler::validate_new_parameters(const std::vector<rclcpp::Parameter> &
     assert(value.type() == id->type());
 
     // check array dimension
-    const std::size_t extent = get_extent(id);
+    const std::size_t size = id->size();
     if (value.isArray() &&
-        (extent != libcamera::dynamic_extent) &&
-        (value.numElements() != extent))
+        (size != libcamera::dynamic_extent) &&
+        (value.numElements() != size))
     {
       msgs_valid_check.push_back(
         parameter.get_name() + ": array dimensions mismatch, expected " +
-        std::to_string(extent) + ", got " + std::to_string(value.numElements()));
+        std::to_string(size) + ", got " + std::to_string(value.numElements()));
       continue;
     }
 
