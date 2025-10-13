@@ -43,7 +43,7 @@ jobs:
           colcon mixin add default https://raw.githubusercontent.com/colcon/colcon-mixin-repository/master/index.yaml
           colcon mixin update default
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: src
 
