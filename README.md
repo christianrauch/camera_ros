@@ -127,6 +127,7 @@ The camera stream is configured once when the node starts via the following stat
 | `orientation`     | `integer`             | camera orientation in 90 degree steps (possible choices: `0`, `90`, `180`, `270`) [default: `0`]                            |
 | `camera_info_url` | `string`              | URL for a camera calibration YAML file (see [Calibration](#calibration)) [default: `~/.ros/camera_info/$NAME.yaml`]         |
 | `frame_id`        | `string`              | frame_id of the camera frame used in the header of the image messages                                                       |
+| `use_node_time`   | `boolean`             | use node time instead of sensor timestamp for image message header [default: `false`]                                       |
 
 
 The configuration is done in the following order:
