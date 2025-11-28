@@ -15,6 +15,7 @@
   <depend>sensor_msgs</depend>
   <depend>camera_info_manager</depend>
   <depend>cv_bridge</depend>
+  <depend>image_transport</depend>
 
   <exec_depend>ros2launch</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
