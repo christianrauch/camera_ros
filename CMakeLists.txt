@@ -18,6 +18,7 @@ set(PACKAGE_DEPENDENCIES
   "sensor_msgs"
   "camera_info_manager"
   "cv_bridge"
+  "image_transport"
 )
 foreach(PKGDEP IN LISTS PACKAGE_DEPENDENCIES)
   find_package(${PKGDEP} REQUIRED)
@@ -79,6 +80,7 @@ target_link_libraries(camera_component PUBLIC
   ${sensor_msgs_TARGETS}
   camera_info_manager::camera_info_manager
   cv_bridge::cv_bridge
+  image_transport::image_transport
 )
 target_include_directories(camera_component PUBLIC ${libcamera_INCLUDE_DIRS})
 target_link_libraries(camera_component PUBLIC ${libcamera_LINK_LIBRARIES})
