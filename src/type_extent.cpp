@@ -1,8 +1,18 @@
 #include "type_extent.hpp"
-#include "exceptions.hpp"
 #include "libcamera_version_utils.hpp"
-#include <libcamera/base/span.h>
 #include <libcamera/control_ids.h>
+
+#if LIBCAMERA_VER_GE(0, 4, 0)
+
+std::size_t
+get_extent(const libcamera::ControlId *const id)
+{
+  return id->size();
+}
+
+#else
+#include "exceptions.hpp"
+#include <libcamera/base/span.h>
 #include <libcamera/controls.h>
 #include <stdexcept>
 #include <string>
@@ -110,3 +120,5 @@ get_extent(const libcamera::ControlId *const id)
 
   throw unknown_control(id);
 }
+
+#endif
