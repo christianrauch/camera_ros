@@ -107,7 +107,12 @@ pv_to_cv(const rclcpp::Parameter &parameter, const libcamera::ControlType &type)
     return libcamera::Span<const CTFloat>(
       std::vector<CTFloat>(parameter.as_double_array().begin(), parameter.as_double_array().end()));
   case rclcpp::ParameterType::PARAMETER_STRING_ARRAY:
-    return libcamera::Span<const CTString>(parameter.as_string_array());
+    // manually convert vector<string> to vector<string_view>
+    std::vector<StringT> string_view_list;
+    for (const std::string &s : parameter.as_string_array()) {
+      string_view_list.emplace_back(s);
+    }
+    return libcamera::Span<const CTString>(string_view_list);
   }
   throw should_not_reach();
 }

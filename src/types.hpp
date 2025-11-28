@@ -26,13 +26,19 @@ to_string(const libcamera::ControlType id);
 template<libcamera::ControlType>
 struct ControlTypeMap;
 
+#if LIBCAMERA_VER_GE(0, 6, 0)
+typedef std::string_view StringT;
+#else
+typedef std::string StringT;
+#endif
+
 MAP(void, None)
 MAP(bool, Bool)
 MAP(uint8_t, Byte)
 MAP(int32_t, Integer32)
 MAP(int64_t, Integer64)
 MAP(float, Float)
-MAP(std::string, String)
+MAP(StringT, String)
 MAP(libcamera::Rectangle, Rectangle)
 MAP(libcamera::Size, Size)
 #if LIBCAMERA_VER_GE(0, 4, 0)
