@@ -626,6 +626,25 @@ CameraNode::process(libcamera::Request *const request)
     if (!running)
       return;
 
+    // prepare message header
+    std_msgs::msg::Header hdr;
+    hdr.frame_id = frame_id;
+
+    // if using sensor timestamps, get the sensor timestamp from the request metadata
+    int64_t sensor_latency = 0;
+    if (!use_node_time) {
+      const libcamera::ControlList &req_metadata = request->metadata();
+      if (const std::optional<int64_t> sensor_ts = req_metadata.get(libcamera::controls::SensorTimestamp)) {
+        sensor_latency = rclcpp::Clock(RCL_STEADY_TIME).now().nanoseconds() - sensor_ts.value();
+      }
+      else {
+        RCLCPP_WARN_STREAM_ONCE(get_logger(), "sensor timestamp not available, falling back to node time as reference");
+      }
+    }
+
+    // Adjust timestamp by the sensor latency
+    hdr.stamp = this->now() - rclcpp::Duration::from_nanoseconds(sensor_latency);
+
     if (request->status() == libcamera::Request::RequestComplete) {
       assert(request->buffers().size() == 1);
 
@@ -635,25 +654,6 @@ CameraNode::process(libcamera::Request *const request)
       size_t bytesused = 0;
       for (const libcamera::FrameMetadata::Plane &plane : metadata.planes())
         bytesused += plane.bytesused;
-
-      // prepare message header
-      std_msgs::msg::Header hdr;
-      hdr.frame_id = frame_id;
-
-      // if using sensor timestamps, get the sensor timestamp from the request metadata
-      int64_t sensor_latency = 0;
-      if (!use_node_time) {
-        const libcamera::ControlList &req_metadata = request->metadata();
-        if (const std::optional<int64_t> sensor_ts = req_metadata.get(libcamera::controls::SensorTimestamp)) {
-          sensor_latency = rclcpp::Clock(RCL_STEADY_TIME).now().nanoseconds() - sensor_ts.value();
-        }
-        else {
-          RCLCPP_WARN_STREAM_ONCE(get_logger(), "sensor timestamp not available, falling back to node time as reference");
-        }
-      }
-
-      // Adjust timestamp by the sensor latency
-      hdr.stamp = this->now() - rclcpp::Duration::from_nanoseconds(sensor_latency);
 
       // prepare image messages
       const libcamera::StreamConfiguration &cfg = stream->configuration();
