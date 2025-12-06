@@ -22,7 +22,7 @@ set(PACKAGE_DEPENDENCIES
 foreach(PKGDEP IN LISTS PACKAGE_DEPENDENCIES)
   find_package(${PKGDEP} REQUIRED)
 endforeach()
-pkg_check_modules(libcamera REQUIRED libcamera>=0.1)
+pkg_check_modules(libcamera REQUIRED libcamera>=0.4)
 
 # new param callbacks need at least 17.0.0
 if(${rclcpp_VERSION} VERSION_GREATER_EQUAL "17")
@@ -58,7 +58,6 @@ add_library(param OBJECT
     src/cv_to_pv.cpp
     src/pv_to_cv.cpp
     src/types.cpp
-    src/type_extent.cpp
     src/ParameterHandler.cpp
     src/ParameterConflictHandler.cpp
 )
