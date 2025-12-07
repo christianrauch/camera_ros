@@ -16,6 +16,7 @@ set(PACKAGE_DEPENDENCIES
   "rclcpp"
   "rclcpp_components"
   "sensor_msgs"
+  "diagnostic_msgs"
   "camera_info_manager"
   "cv_bridge"
 )
@@ -77,6 +78,7 @@ target_link_libraries(camera_component PUBLIC
   rclcpp::rclcpp
   rclcpp_components::component
   ${sensor_msgs_TARGETS}
+  ${diagnostic_msgs_TARGETS}
   camera_info_manager::camera_info_manager
   cv_bridge::cv_bridge
 )

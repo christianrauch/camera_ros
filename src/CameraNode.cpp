@@ -15,6 +15,7 @@
 #include <cv_bridge/cv_bridge.h>
 #endif
 #include <atomic>
+#include <diagnostic_msgs/msg/diagnostic_array.hpp>
 #include <iostream>
 #include <libcamera/base/shared_fd.h>
 #include <libcamera/base/signal.h>
@@ -100,6 +101,7 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_image;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr pub_image_compressed;
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr pub_ci;
+  rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr pub_diagnostics;
 
   camera_info_manager::CameraInfoManager cim;
 
@@ -329,6 +331,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   pub_image_compressed =
     this->create_publisher<sensor_msgs::msg::CompressedImage>("~/image_raw/compressed", 1);
   pub_ci = this->create_publisher<sensor_msgs::msg::CameraInfo>("~/camera_info", 1);
+  pub_diagnostics =
+    this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 1);
 
   // start camera manager and check for cameras
   camera_manager.start();
@@ -645,8 +649,23 @@ CameraNode::process(libcamera::Request *const request)
     // Adjust timestamp by the sensor latency
     hdr.stamp = this->now() - rclcpp::Duration::from_nanoseconds(sensor_latency);
 
+    diagnostic_msgs::msg::DiagnosticArray diagnostic_array;
+    diagnostic_array.header = hdr;
+
+    diagnostic_msgs::msg::DiagnosticStatus diagnostic_status;
+    diagnostic_status.hardware_id = camera->id();
+
     if (request->status() == libcamera::Request::RequestComplete) {
       assert(request->buffers().size() == 1);
+
+      diagnostic_status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+
+      for (const auto &[id, value] : request->metadata()) {
+        diagnostic_msgs::msg::KeyValue kv;
+        kv.key = libcamera::controls::controls.at(id)->name();
+        kv.value = value.toString();
+        diagnostic_status.values.push_back(kv);
+      }
 
       // get the stream and buffer from the request
       const libcamera::FrameBuffer *buffer = request->findBuffer(stream);
@@ -709,8 +728,13 @@ CameraNode::process(libcamera::Request *const request)
       pub_ci->publish(ci);
     }
     else if (request->status() == libcamera::Request::RequestCancelled) {
+      diagnostic_status.level = diagnostic_msgs::msg::DiagnosticStatus::WARN;
       RCLCPP_ERROR_STREAM(get_logger(), "request '" << request->toString() << "' cancelled");
     }
+
+    diagnostic_array.status.push_back(diagnostic_status);
+
+    pub_diagnostics->publish(diagnostic_array);
 
     // redeclare implicitly undeclared parameters
     parameter_handler.redeclare();
