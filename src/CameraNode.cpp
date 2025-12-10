@@ -380,7 +380,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   if (camera->acquire())
     throw std::runtime_error("failed to acquire camera");
 
-  camera->disconnect.connect(this, &CameraNode::onDisconnect);
+  camera->disconnected.connect(this, &CameraNode::onDisconnect);
 
   std::vector<libcamera::StreamRole> roles {role};
 
@@ -586,7 +586,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
 CameraNode::~CameraNode()
 {
   if (camera) {
-    camera->disconnect.disconnect(this);
+    camera->disconnected.disconnect(this);
   }
 
   // stop request callbacks
