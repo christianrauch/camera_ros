@@ -621,6 +621,9 @@ void
 CameraNode::onDisconnect()
 {
   RCLCPP_FATAL_STREAM(get_logger(), "Camera '" << camera->id() << "' disconnected!");
+  running = false;
+  for (auto &[req, condvar] : request_condvars)
+    condvar.notify_all();
   rclcpp::shutdown();
 }
 
@@ -634,7 +637,7 @@ CameraNode::requestComplete(libcamera::Request *const request)
 void
 CameraNode::process(libcamera::Request *const request)
 {
-  while (true) {
+  while (rclcpp::ok() && running) {
     // block until request is available
     std::unique_lock lk(request_mutexes.at(request));
     request_condvars.at(request).wait(lk);
