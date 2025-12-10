@@ -607,6 +607,9 @@ CameraNode::~CameraNode()
   // stop camera
   if (camera->stop())
     std::cerr << "failed to stop camera" << std::endl;
+
+  requests.clear();
+
   allocator->free(stream);
   allocator.reset();
   camera->release();
@@ -620,7 +623,7 @@ CameraNode::~CameraNode()
 void
 CameraNode::onDisconnect()
 {
-  RCLCPP_FATAL_STREAM(get_logger(), "Camera '" << camera->id() << "' disconnected!");
+  RCLCPP_FATAL_STREAM(get_logger(), "camera '" << camera->id() << "' disconnected!");
   running = false;
   for (auto &[req, condvar] : request_condvars)
     condvar.notify_all();
