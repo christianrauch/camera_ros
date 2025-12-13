@@ -16,6 +16,7 @@
 #endif
 #include <atomic>
 #include <iostream>
+#include <mutex>
 #include <libcamera/base/shared_fd.h>
 #include <libcamera/base/signal.h>
 #include <libcamera/base/span.h>
@@ -70,6 +71,11 @@ class NodeOptions;
 
 namespace camera
 {
+
+// Global shared pointer to the camera manager
+static std::weak_ptr<libcamera::CameraManager> g_camera_manager;
+static std::mutex g_camera_manager_mutex;
+
 class CameraNode : public rclcpp::Node
 {
 public:
@@ -78,7 +84,7 @@ public:
   ~CameraNode();
 
 private:
-  libcamera::CameraManager camera_manager;
+  std::shared_ptr<libcamera::CameraManager> camera_manager;
   std::shared_ptr<libcamera::Camera> camera;
   libcamera::Stream *stream;
   std::shared_ptr<libcamera::FrameBufferAllocator> allocator;
@@ -331,16 +337,29 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   pub_ci = this->create_publisher<sensor_msgs::msg::CameraInfo>("~/camera_info", 1);
 
   // start camera manager and check for cameras
-  camera_manager.start();
-  if (camera_manager.cameras().empty())
+  {
+    std::lock_guard<std::mutex> lock(g_camera_manager_mutex);
+    camera_manager = g_camera_manager.lock();
+    if (!camera_manager) {
+      camera_manager = std::shared_ptr<libcamera::CameraManager>(
+        new libcamera::CameraManager, [](auto * p) {
+          p->stop();
+          delete p;
+        });
+      camera_manager->start();
+      g_camera_manager = camera_manager;
+    }
+  }
+
+  if (camera_manager->cameras().empty())
     throw std::runtime_error("no cameras available");
 
   // get the camera
   switch (camera_id.get_type()) {
   case rclcpp::ParameterType::PARAMETER_NOT_SET:
     // use first camera as default
-    camera = camera_manager.cameras().front();
-    RCLCPP_INFO_STREAM(get_logger(), camera_manager);
+    camera = camera_manager->cameras().front();
+    RCLCPP_INFO_STREAM(get_logger(), *camera_manager);
     RCLCPP_WARN_STREAM(get_logger(),
                        "no camera selected, using default: \"" << camera->id() << "\"");
     RCLCPP_WARN_STREAM(get_logger(), "set parameter 'camera' to silence this warning");
@@ -348,19 +367,19 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   case rclcpp::ParameterType::PARAMETER_INTEGER:
   {
     const size_t &id = camera_id.get<rclcpp::ParameterType::PARAMETER_INTEGER>();
-    if (id >= camera_manager.cameras().size()) {
-      RCLCPP_INFO_STREAM(get_logger(), camera_manager);
+    if (id >= camera_manager->cameras().size()) {
+      RCLCPP_INFO_STREAM(get_logger(), *camera_manager);
       throw std::runtime_error("camera with id " + std::to_string(id) + " does not exist");
     }
-    camera = camera_manager.cameras().at(id);
+    camera = camera_manager->cameras().at(id);
     RCLCPP_DEBUG_STREAM(get_logger(), "found camera by id: " << id);
   } break;
   case rclcpp::ParameterType::PARAMETER_STRING:
   {
     const std::string &name = camera_id.get<rclcpp::ParameterType::PARAMETER_STRING>();
-    camera = camera_manager.get(name);
+    camera = camera_manager->get(name);
     if (!camera) {
-      RCLCPP_INFO_STREAM(get_logger(), camera_manager);
+      RCLCPP_INFO_STREAM(get_logger(), *camera_manager);
       throw std::runtime_error("camera with name " + name + " does not exist");
     }
     RCLCPP_DEBUG_STREAM(get_logger(), "found camera by name: \"" << name << "\"");
@@ -602,7 +621,7 @@ CameraNode::~CameraNode()
   allocator.reset();
   camera->release();
   camera.reset();
-  camera_manager.stop();
+  // camera_manager->stop(); // Handled by shared_ptr deleter
   for (const auto &e : buffer_info)
     if (munmap(e.second.data, e.second.size) == -1)
       std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
