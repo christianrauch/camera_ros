@@ -342,7 +342,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     camera_manager = g_camera_manager.lock();
     if (!camera_manager) {
       camera_manager = std::shared_ptr<libcamera::CameraManager>(
-        new libcamera::CameraManager, [](auto * p) {
+        new libcamera::CameraManager, [](auto *p) {
           p->stop();
           delete p;
         });
