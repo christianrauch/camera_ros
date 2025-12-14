@@ -768,3 +768,6 @@ CameraNode::onParameterChange(const std::vector<rclcpp::Parameter> &parameters)
 #endif
 
 } // namespace camera
+
+std::weak_ptr<libcamera::CameraManager> camera::CameraNode::g_camera_manager;
+std::mutex camera::CameraNode::g_camera_manager_mutex;
