@@ -72,10 +72,6 @@ class NodeOptions;
 namespace camera
 {
 
-// Global shared pointer to the camera manager
-static std::weak_ptr<libcamera::CameraManager> g_camera_manager;
-static std::mutex g_camera_manager_mutex;
-
 class CameraNode : public rclcpp::Node
 {
 public:
@@ -84,6 +80,9 @@ public:
   ~CameraNode();
 
 private:
+  static std::weak_ptr<libcamera::CameraManager> g_camera_manager;
+  static std::mutex g_camera_manager_mutex;
+
   std::shared_ptr<libcamera::CameraManager> camera_manager;
   std::shared_ptr<libcamera::Camera> camera;
   libcamera::Stream *stream;
@@ -621,7 +620,6 @@ CameraNode::~CameraNode()
   allocator.reset();
   camera->release();
   camera.reset();
-  // camera_manager->stop(); // Handled by shared_ptr deleter
   for (const auto &e : buffer_info)
     if (munmap(e.second.data, e.second.size) == -1)
       std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
