@@ -117,6 +117,9 @@ private:
   std::atomic_uint8_t jpeg_quality;
 
   void
+  onDisconnect();
+
+  void
   requestComplete(libcamera::Request *const request);
 
   void
@@ -377,6 +380,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   if (camera->acquire())
     throw std::runtime_error("failed to acquire camera");
 
+  camera->disconnected.connect(this, &CameraNode::onDisconnect);
+
   std::vector<libcamera::StreamRole> roles {role};
 
   // Add the RAW role if the sensor_size is defined
@@ -580,6 +585,10 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
 
 CameraNode::~CameraNode()
 {
+  if (camera) {
+    camera->disconnected.disconnect(this);
+  }
+
   // stop request callbacks
   for (std::unique_ptr<libcamera::Request> &request : requests)
     camera->requestCompleted.disconnect(request.get());
@@ -598,6 +607,9 @@ CameraNode::~CameraNode()
   // stop camera
   if (camera->stop())
     std::cerr << "failed to stop camera" << std::endl;
+
+  requests.clear();
+
   allocator->free(stream);
   allocator.reset();
   camera->release();
@@ -606,6 +618,16 @@ CameraNode::~CameraNode()
   for (const auto &e : buffer_info)
     if (munmap(e.second.data, e.second.size) == -1)
       std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
+}
+
+void
+CameraNode::onDisconnect()
+{
+  RCLCPP_FATAL_STREAM(get_logger(), "camera '" << camera->id() << "' disconnected!");
+  running = false;
+  for (auto &[req, condvar] : request_condvars)
+    condvar.notify_all();
+  rclcpp::shutdown();
 }
 
 void
@@ -618,7 +640,7 @@ CameraNode::requestComplete(libcamera::Request *const request)
 void
 CameraNode::process(libcamera::Request *const request)
 {
-  while (true) {
+  while (rclcpp::ok() && running) {
     // block until request is available
     std::unique_lock lk(request_mutexes.at(request));
     request_condvars.at(request).wait(lk);
