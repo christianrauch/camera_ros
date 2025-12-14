@@ -106,14 +106,30 @@ libcamera::ControlValue
 clamp_array(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
             const libcamera::ControlValue &max)
 {
+  assert(min.isArray() == max.isArray());
+  assert(min.numElements() == max.numElements());
+
   const libcamera::Span<const T> v = value.get<libcamera::Span<const T>>();
-  const libcamera::Span<const T> a = min.get<libcamera::Span<const T>>();
-  const libcamera::Span<const T> b = max.get<libcamera::Span<const T>>();
 
   std::vector<T> vclamp(v.size());
 
-  for (size_t i = 0; i < v.size(); i++)
-    vclamp[i] = std::clamp(v[i], a[i], b[i]);
+  if (min.isArray() == true && max.isArray() == true) {
+    // clamp individual elements with their individual min/max values
+    const libcamera::Span<const T> a = min.get<libcamera::Span<const T>>();
+    const libcamera::Span<const T> b = max.get<libcamera::Span<const T>>();
+    for (size_t i = 0; i < v.size(); i++)
+      vclamp[i] = std::clamp(v[i], a[i], b[i]);
+  }
+  else if (min.isArray() == false && max.isArray() == false) {
+    // clamp array elements via scalar min/max value
+    const T a = min.get<const T>();
+    const T b = max.get<const T>();
+    for (size_t i = 0; i < v.size(); i++)
+      vclamp[i] = std::clamp(v[i], a, b);
+  }
+  else {
+    throw should_not_reach();
+  }
 
   return libcamera::ControlValue(libcamera::Span<const T>(vclamp));
 }
@@ -140,7 +156,7 @@ libcamera::ControlValue
 clamp(const libcamera::ControlValue &value, const libcamera::ControlValue &min,
       const libcamera::ControlValue &max)
 {
-  if (min.type() != max.type())
+  if (min.type() != max.type() || min.isArray() != max.isArray() || min.numElements() != max.numElements())
     throw invalid_conversion("minimum (" + std::to_string(min.type()) + ") and maximum (" +
                              std::to_string(max.type()) + ") types mismatch");
 
