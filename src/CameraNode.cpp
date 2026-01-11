@@ -581,8 +581,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
 CameraNode::~CameraNode()
 {
   // stop request callbacks
-  for (std::unique_ptr<libcamera::Request> &request : requests)
-    camera->requestCompleted.disconnect(request.get());
+  camera->requestCompleted.disconnect(this, &CameraNode::requestComplete);
 
   // stop request processing threads
   running = false;
