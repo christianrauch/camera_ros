@@ -1,6 +1,9 @@
 name: bloom
 
-on: [push, pull_request]
+on:
+  pull_request:
+    paths-ignore:
+      - "README.md"
 
 jobs:
   build:
