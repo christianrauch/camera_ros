@@ -574,8 +574,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     throw std::runtime_error("failed to start camera");
 
   // queue all requests
-  for (std::unique_ptr<libcamera::Request> &request : requests)
-    camera->queueRequest(request.get());
+  for (std::unique_ptr<libcamera::Request> &request : requests) {
+    if (const int ret = camera->queueRequest(request.get()); ret < 0) {
+      RCLCPP_WARN_STREAM(get_logger(), "failed to queue request (" << request->toString() << "): " << strerror(-ret));
+    }
+  }
 }
 
 CameraNode::~CameraNode()
@@ -717,7 +720,10 @@ CameraNode::process(libcamera::Request *const request)
     // queue the request again for the next frame and update controls
     request->reuse(libcamera::Request::ReuseBuffers);
     parameter_handler.move_control_values(request->controls());
-    camera->queueRequest(request);
+
+    if (const int ret = camera->queueRequest(request); ret < 0) {
+      RCLCPP_WARN_STREAM(get_logger(), "failed to queue request (" << request->toString() << "): " << strerror(-ret));
+    }
 
     for (const auto &[id, value] : request->controls()) {
       const std::string &name = libcamera::controls::controls.at(id)->name();

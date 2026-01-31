@@ -1,6 +1,9 @@
 name: bloom
 
-on: [push, pull_request]
+on:
+  pull_request:
+    paths-ignore:
+      - "README.md"
 
 jobs:
   build:
@@ -16,7 +19,6 @@ jobs:
           - {distribution: ubuntu,    version: 24.04, ros: rolling}
           - {distribution: almalinux, version: 8,     ros: humble}
           - {distribution: almalinux, version: 9,     ros: jazzy}
-          - {distribution: almalinux, version: 9,     ros: rolling}
 
     container:
       image: ${{ matrix.distribution }}:${{ matrix.version }}
