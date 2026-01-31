@@ -45,10 +45,23 @@ def generate_launch_description() -> LaunchDescription:
     # camera node
     composable_nodes = [
         ComposableNode(
+            name='camera_node_0',
             package='camera_ros',
             plugin='camera::CameraNode',
             parameters=[{
-                "camera": camera_param,
+                "camera": 0,
+                "width": 640,
+                "height": 480,
+                "format": format_param,
+            }],
+            extra_arguments=[{'use_intra_process_comms': True}],
+        ),
+        ComposableNode(
+            name='camera_node_1',
+            package='camera_ros',
+            plugin='camera::CameraNode',
+            parameters=[{
+                "camera": 1,
                 "width": 640,
                 "height": 480,
                 "format": format_param,
@@ -57,16 +70,16 @@ def generate_launch_description() -> LaunchDescription:
         ),
     ]
 
-    # optionally add ImageViewNode to show camera image
-    if has_resource("packages", "image_view"):
-        composable_nodes += [
-            ComposableNode(
-                package='image_view',
-                plugin='image_view::ImageViewNode',
-                remappings=[('/image', '/camera/image_raw')],
-                extra_arguments=[{'use_intra_process_comms': True}],
-            ),
-        ]
+    # # optionally add ImageViewNode to show camera image
+    # if has_resource("packages", "image_view"):
+    #     composable_nodes += [
+    #         ComposableNode(
+    #             package='image_view',
+    #             plugin='image_view::ImageViewNode',
+    #             remappings=[('/image', '/camera/image_raw')],
+    #             extra_arguments=[{'use_intra_process_comms': True}],
+    #         ),
+    #     ]
 
     # composable nodes in single container
     container = ComposableNodeContainer(
