@@ -78,7 +78,8 @@ public:
   ~CameraNode();
 
 private:
-  libcamera::CameraManager camera_manager;
+  static libcamera::CameraManager camera_manager;
+  static std::mutex camera_manager_mutex;
   std::shared_ptr<libcamera::Camera> camera;
   libcamera::Stream *stream;
   std::shared_ptr<libcamera::FrameBufferAllocator> allocator;
@@ -130,6 +131,9 @@ private:
   onParameterChange(const std::vector<rclcpp::Parameter> &parameters);
 #endif
 };
+
+libcamera::CameraManager CameraNode::camera_manager = {};
+std::mutex camera::CameraNode::camera_manager_mutex;
 
 RCLCPP_COMPONENTS_REGISTER_NODE(camera::CameraNode)
 
@@ -331,6 +335,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   pub_ci = this->create_publisher<sensor_msgs::msg::CameraInfo>("~/camera_info", 1);
 
   // start camera manager and check for cameras
+  camera_manager_mutex.lock();
   camera_manager.start();
   if (camera_manager.cameras().empty())
     throw std::runtime_error("no cameras available");
@@ -370,6 +375,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
                                         << rclcpp::to_string(camera_id.get_type()));
     break;
   }
+  camera_manager_mutex.unlock();
 
   if (!camera)
     throw std::runtime_error("failed to find camera");
@@ -604,7 +610,9 @@ CameraNode::~CameraNode()
   allocator.reset();
   camera->release();
   camera.reset();
+  camera_manager_mutex.lock();
   camera_manager.stop();
+  camera_manager_mutex.unlock();
   for (const auto &e : buffer_info)
     if (munmap(e.second.data, e.second.size) == -1)
       std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
