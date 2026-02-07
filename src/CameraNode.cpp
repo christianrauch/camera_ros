@@ -97,6 +97,8 @@ private:
 
   bool use_node_time;
 
+  static const rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> pubopts;
+
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_image;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr pub_image_compressed;
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr pub_ci;
@@ -133,6 +135,15 @@ private:
 
 RCLCPP_COMPONENTS_REGISTER_NODE(camera::CameraNode)
 
+const rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> CameraNode::pubopts = []() {
+  rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> options;
+  options.qos_overriding_options = rclcpp::QosOverridingOptions {
+    rclcpp::QosPolicyKind::Depth,
+    rclcpp::QosPolicyKind::Durability,
+    rclcpp::QosPolicyKind::History,
+    rclcpp::QosPolicyKind::Reliability};
+  return options;
+}();
 
 libcamera::StreamRole
 get_role(const std::string &role)
@@ -325,10 +336,10 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   use_node_time = declare_parameter<bool>("use_node_time", false, param_descr_use_node_time);
 
   // publisher for raw and compressed image
-  pub_image = this->create_publisher<sensor_msgs::msg::Image>("~/image_raw", 1);
+  pub_image = this->create_publisher<sensor_msgs::msg::Image>("~/image_raw", 1, pubopts);
   pub_image_compressed =
-    this->create_publisher<sensor_msgs::msg::CompressedImage>("~/image_raw/compressed", 1);
-  pub_ci = this->create_publisher<sensor_msgs::msg::CameraInfo>("~/camera_info", 1);
+    this->create_publisher<sensor_msgs::msg::CompressedImage>("~/image_raw/compressed", 1, pubopts);
+  pub_ci = this->create_publisher<sensor_msgs::msg::CameraInfo>("~/camera_info", 1, pubopts);
 
   // start camera manager and check for cameras
   camera_manager.start();
