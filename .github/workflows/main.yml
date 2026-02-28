@@ -3,6 +3,7 @@ name: colcon
 on:
   pull_request:
     paths-ignore:
+      - ".github/ISSUE_TEMPLATE/"
       - "README.md"
 
 jobs:
