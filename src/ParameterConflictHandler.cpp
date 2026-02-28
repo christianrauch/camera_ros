@@ -173,7 +173,8 @@ ParameterConflictHandler::restore(std::vector<rclcpp::Parameter> &parameters)
   if (is_set(parameters, (HAS_ETM ? ETM : AE))) {
     // restore 'ExposureTime' when 'AeEnable' is off
     if (HAS_ETM ? is_int_eq(parameters, ETM, ETM_Manual) : !is_true(parameters, AE)) {
-      if (tmp_store.count(ET)) {
+      //  ... and it has not been set yet
+      if (tmp_store.count(ET) && !is_set(parameters, ET)) {
         parameters.push_back({ET, tmp_store.at(ET)});
         tmp_store.erase(ET);
       }
