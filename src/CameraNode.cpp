@@ -331,7 +331,9 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   pub_ci = this->create_publisher<sensor_msgs::msg::CameraInfo>("~/camera_info", 1);
 
   // start camera manager and check for cameras
-  camera_manager.start();
+  const int ec_start = camera_manager.start();
+  if (ec_start < 0)
+    throw std::runtime_error("failed to start camera manager: " + std::string(std::strerror(-ec_start)));
   if (camera_manager.cameras().empty())
     throw std::runtime_error("no cameras available");
 
