@@ -606,11 +606,17 @@ CameraNode::~CameraNode()
     thread.join();
 
   // stop camera
-  if (camera->stop())
-    std::cerr << "failed to stop camera" << std::endl;
-  allocator->free(stream);
+  if (camera->stop()) {
+    RCLCPP_ERROR_STREAM(get_logger(), "failed to stop camera");
+  }
+  const int ec_alloc_free = allocator->free(stream);
+  if (ec_alloc_free < 0) {
+    RCLCPP_ERROR_STREAM(get_logger(), "failed to free buffers: " << std::strerror(-ec_alloc_free));
+  }
   allocator.reset();
-  camera->release();
+  if (camera->release() < 0) {
+    RCLCPP_ERROR_STREAM(get_logger(), "camera is busy and cannot be released");
+  }
   camera.reset();
   camera_manager.stop();
   for (const auto &e : buffer_info)
