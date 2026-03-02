@@ -721,13 +721,13 @@ CameraNode::process(libcamera::Request *const request)
     request->reuse(libcamera::Request::ReuseBuffers);
     parameter_handler.move_control_values(request->controls());
 
-    if (const int ret = camera->queueRequest(request); ret < 0) {
-      RCLCPP_WARN_STREAM(get_logger(), "failed to queue request (" << request->toString() << "): " << strerror(-ret));
-    }
-
     for (const auto &[id, value] : request->controls()) {
       const std::string &name = libcamera::controls::controls.at(id)->name();
       RCLCPP_DEBUG_STREAM(get_logger(), "applied control '" << name << "': " << (value.isNone() ? "NONE" : value.toString()));
+    }
+
+    if (const int ret = camera->queueRequest(request); ret < 0) {
+      RCLCPP_WARN_STREAM(get_logger(), "failed to queue request (" << request->toString() << "): " << strerror(-ret));
     }
   }
 }
