@@ -523,7 +523,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   stream = scfg.stream();
 
   allocator = std::make_shared<libcamera::FrameBufferAllocator>(camera);
-  allocator->allocate(stream);
+  const int nbuffer = allocator->allocate(stream);
+
+  if (nbuffer < 0) {
+    throw std::runtime_error("allocation failed: " + std::string(std::strerror(-nbuffer)));
+  }
 
   for (const std::unique_ptr<libcamera::FrameBuffer> &buffer : allocator->buffers(stream)) {
     std::unique_ptr<libcamera::Request> request = camera->createRequest();
@@ -556,6 +560,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
 
     requests.push_back(std::move(request));
   }
+
+  assert(nbuffer >= 0 && requests.size() == size_t(nbuffer));
 
   // create a processing thread per request
   running = true;
