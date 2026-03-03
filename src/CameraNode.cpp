@@ -79,8 +79,10 @@ public:
   ~CameraNode();
 
 private:
-  libcamera::CameraManager camera_manager;
+  static libcamera::CameraManager camera_manager;
+  static std::mutex camera_manager_mutex;
   std::shared_ptr<libcamera::Camera> camera;
+  static std::atomic<size_t> cameras_in_use;
   libcamera::Stream *stream;
   std::shared_ptr<libcamera::FrameBufferAllocator> allocator;
   std::vector<std::unique_ptr<libcamera::Request>> requests;
@@ -137,6 +139,10 @@ private:
   onParameterChange(const std::vector<rclcpp::Parameter> &parameters);
 #endif
 };
+
+libcamera::CameraManager CameraNode::camera_manager = {};
+std::atomic<size_t> CameraNode::cameras_in_use = 0;
+std::mutex camera::CameraNode::camera_manager_mutex;
 
 RCLCPP_COMPONENTS_REGISTER_NODE(camera::CameraNode)
 
@@ -348,6 +354,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 1);
 
   // start camera manager and check for cameras
+  std::scoped_lock camera_manager_lk(camera_manager_mutex);
   const int ec_start = camera_manager.start();
   if (ec_start < 0)
     throw std::runtime_error("failed to start camera manager: " + std::string(std::strerror(-ec_start)));
@@ -618,6 +625,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     throw std::runtime_error("failed to start camera: unknown status");
   }
 
+  cameras_in_use++;
+
   // queue all requests
   for (std::unique_ptr<libcamera::Request> &request : requests) {
     if (const int ret = camera->queueRequest(request.get()); ret < 0) {
@@ -664,7 +673,12 @@ CameraNode::~CameraNode()
     RCLCPP_ERROR_STREAM(get_logger(), "failed to release camera: unknown status");
   }
   camera.reset();
-  camera_manager.stop();
+  camera_manager_mutex.lock();
+  cameras_in_use--;
+  if (cameras_in_use == 0) {
+    camera_manager.stop();
+  }
+  camera_manager_mutex.unlock();
   for (const auto &e : buffer_info)
     if (munmap(e.second.data, e.second.size) == -1)
       std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
