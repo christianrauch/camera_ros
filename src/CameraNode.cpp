@@ -331,7 +331,9 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   pub_ci = this->create_publisher<sensor_msgs::msg::CameraInfo>("~/camera_info", 1);
 
   // start camera manager and check for cameras
-  camera_manager.start();
+  const int ec_start = camera_manager.start();
+  if (ec_start < 0)
+    throw std::runtime_error("failed to start camera manager: " + std::string(std::strerror(-ec_start)));
   if (camera_manager.cameras().empty())
     throw std::runtime_error("no cameras available");
 
@@ -523,7 +525,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   stream = scfg.stream();
 
   allocator = std::make_shared<libcamera::FrameBufferAllocator>(camera);
-  allocator->allocate(stream);
+  const int nbuffer = allocator->allocate(stream);
+
+  if (nbuffer < 0) {
+    throw std::runtime_error("allocation failed: " + std::string(std::strerror(-nbuffer)));
+  }
 
   for (const std::unique_ptr<libcamera::FrameBuffer> &buffer : allocator->buffers(stream)) {
     std::unique_ptr<libcamera::Request> request = camera->createRequest();
@@ -556,6 +562,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
 
     requests.push_back(std::move(request));
   }
+
+  assert(nbuffer >= 0 && requests.size() == size_t(nbuffer));
 
   // create a processing thread per request
   running = true;
@@ -598,11 +606,17 @@ CameraNode::~CameraNode()
     thread.join();
 
   // stop camera
-  if (camera->stop())
-    std::cerr << "failed to stop camera" << std::endl;
-  allocator->free(stream);
+  if (camera->stop()) {
+    RCLCPP_ERROR_STREAM(get_logger(), "failed to stop camera");
+  }
+  const int ec_alloc_free = allocator->free(stream);
+  if (ec_alloc_free < 0) {
+    RCLCPP_ERROR_STREAM(get_logger(), "failed to free buffers: " << std::strerror(-ec_alloc_free));
+  }
   allocator.reset();
-  camera->release();
+  if (camera->release() < 0) {
+    RCLCPP_ERROR_STREAM(get_logger(), "camera is busy and cannot be released");
+  }
   camera.reset();
   camera_manager.stop();
   for (const auto &e : buffer_info)
@@ -721,13 +735,13 @@ CameraNode::process(libcamera::Request *const request)
     request->reuse(libcamera::Request::ReuseBuffers);
     parameter_handler.move_control_values(request->controls());
 
-    if (const int ret = camera->queueRequest(request); ret < 0) {
-      RCLCPP_WARN_STREAM(get_logger(), "failed to queue request (" << request->toString() << "): " << strerror(-ret));
-    }
-
     for (const auto &[id, value] : request->controls()) {
       const std::string &name = libcamera::controls::controls.at(id)->name();
       RCLCPP_DEBUG_STREAM(get_logger(), "applied control '" << name << "': " << (value.isNone() ? "NONE" : value.toString()));
+    }
+
+    if (const int ret = camera->queueRequest(request); ret < 0) {
+      RCLCPP_WARN_STREAM(get_logger(), "failed to queue request (" << request->toString() << "): " << strerror(-ret));
     }
   }
 }
