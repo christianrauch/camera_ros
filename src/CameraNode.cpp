@@ -676,7 +676,11 @@ CameraNode::process(libcamera::Request *const request)
 
       diagnostic_status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
 
-      for (const auto &[id, value] : request->metadata()) {
+      // publish metadata, sorted by control ID
+      for (const auto &[id, value] : std::map {
+             request->metadata().begin(),
+             request->metadata().end(),
+           }) {
         diagnostic_msgs::msg::KeyValue kv;
         kv.key = libcamera::controls::controls.at(id)->name();
         kv.value = value.toString();
