@@ -16,6 +16,7 @@ jobs:
         include:
           - {distribution: ubuntu,    version: 22.04, ros: humble}
           - {distribution: ubuntu,    version: 24.04, ros: jazzy}
+          - {distribution: ubuntu,    version: 26.04, ros: lyrical}
           - {distribution: almalinux, version: 8,     ros: humble}
           - {distribution: almalinux, version: 9,     ros: jazzy}
 
