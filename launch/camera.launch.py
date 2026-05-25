@@ -10,7 +10,7 @@ from launch_ros.descriptions import ComposableNode
 
 def generate_launch_description() -> LaunchDescription:
     """
-    Generate a launch description with for the camera node and a visualiser.
+    Generate a launch description with a camera node and visualiser.
 
     Returns
     -------

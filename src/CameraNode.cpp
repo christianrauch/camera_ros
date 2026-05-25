@@ -200,8 +200,7 @@ compressImageMsg(const sensor_msgs::msg::Image &source,
   destination.header = source.header;
   cv::Mat image;
   if (cv_ptr->encoding == enc::BGR8 || cv_ptr->encoding == enc::BGRA8 ||
-      cv_ptr->encoding == enc::MONO8 || cv_ptr->encoding == enc::MONO16)
-  {
+      cv_ptr->encoding == enc::MONO8 || cv_ptr->encoding == enc::MONO16) {
     image = cv_ptr->image;
   }
   else {

@@ -368,8 +368,7 @@ ParameterHandler::validate_new_parameters(const std::vector<rclcpp::Parameter> &
     const std::size_t extent = get_extent(id);
     if (value.isArray() &&
         (extent != libcamera::dynamic_extent) &&
-        (value.numElements() != extent))
-    {
+        (value.numElements() != extent)) {
       msgs_valid_check.push_back(
         parameter.get_name() + ": array dimensions mismatch, expected " +
         std::to_string(extent) + ", got " + std::to_string(value.numElements()));

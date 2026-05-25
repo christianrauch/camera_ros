@@ -134,8 +134,7 @@ ParameterConflictHandler::resolve_overrides(ParameterValueMap &p)
   // restore 'ExposureTime'
   if (is_set(p, HAS_ETM ? ETM : AE) &&
       (HAS_ETM ? (p.at(ETM).get<int32_t>() == ETM_Manual) : !p.at(AE).get<bool>()) &&
-      !is_set(p, ET) && store.count(ET))
-  {
+      !is_set(p, ET) && store.count(ET)) {
     p.at(ET) = store.at(ET);
     store.erase(ET);
   }
