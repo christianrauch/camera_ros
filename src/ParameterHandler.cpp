@@ -229,6 +229,33 @@ ParameterHandler::move_control_values(libcamera::ControlList &controls)
   control_values.clear();
 }
 
+bool
+ParameterHandler::sync_control_values(const libcamera::ControlList &controls)
+{
+  if (controls.empty())
+    return true;
+
+  // set ROS parameters to synchronise control values to internal parameter store
+
+  std::vector<rclcpp::Parameter> parameters_list;
+  for (const auto &[id, value] : controls) {
+    const std::string &name = libcamera::controls::controls.at(id)->name();
+    if (camera_controls.count(name)) {
+      parameters_list.push_back({name, cv_to_pv(value)});
+    }
+  }
+
+  const rcl_interfaces::msg::SetParametersResult param_set_result =
+    node->set_parameters_atomically(parameters_list);
+
+  // clear control values that have been set by the callbacks
+  control_values_lock.lock();
+  control_values.clear();
+  control_values_lock.unlock();
+
+  return param_set_result.successful;
+}
+
 void
 ParameterHandler::redeclare()
 {
