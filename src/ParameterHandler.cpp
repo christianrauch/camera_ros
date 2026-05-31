@@ -230,6 +230,43 @@ ParameterHandler::move_control_values(libcamera::ControlList &controls)
 }
 
 void
+ParameterHandler::sync_control_values(const libcamera::ControlList &controls)
+{
+  if (controls.empty())
+    return;
+
+  // synchronise extern values to internal representation
+  control_values_lock.lock();
+  control_values.merge(controls
+#if LIBCAMERA_VER_GE(0, 2, 0)
+                       ,
+                       libcamera::ControlList::MergePolicy::OverwriteExisting
+#endif
+  );
+  control_values_lock.unlock();
+
+  std::vector<rclcpp::Parameter> parameters_list;
+  for (const auto &[id, value] : controls) {
+    const std::string &name = libcamera::controls::controls.at(id)->name();
+    if (!camera_controls.count(name))
+      continue;
+
+    parameters_list.push_back({name, cv_to_pv(value)});
+  }
+
+  RCLCPP_ERROR_STREAM(node->get_logger(), "set parameters ...");
+  inhibit_param_callbacks = true;
+  const rcl_interfaces::msg::SetParametersResult param_set_result =
+    node->set_parameters_atomically(parameters_list);
+  inhibit_param_callbacks = false;
+
+  if (!param_set_result.successful)
+    RCLCPP_ERROR_STREAM(node->get_logger(), "Cannot set parameters: " << param_set_result.reason);
+
+  RCLCPP_WARN_STREAM(node->get_logger(), "set parameters: " << param_set_result.reason);
+}
+
+void
 ParameterHandler::redeclare()
 {
   // rclcpp::Node::set_parameter() implicitly undeclares a parameter if its type

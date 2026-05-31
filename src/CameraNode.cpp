@@ -755,6 +755,12 @@ CameraNode::process(libcamera::Request *const request)
 
     pub_diagnostics->publish(diagnostic_array);
 
+    RCLCPP_INFO_STREAM(get_logger(), "req controls: " << request->controls().size());
+    for (const auto &[id, value] : request->controls()) {
+      const std::string &name = libcamera::controls::controls.at(id)->name();
+      RCLCPP_DEBUG_STREAM(get_logger(), "applied control '" << name << "': " << (value.isNone() ? "NONE" : value.toString()));
+    }
+
     // redeclare implicitly undeclared parameters
     parameter_handler.redeclare();
 
@@ -762,6 +768,7 @@ CameraNode::process(libcamera::Request *const request)
     request->reuse(libcamera::Request::ReuseBuffers);
     parameter_handler.move_control_values(request->controls());
 
+    RCLCPP_INFO_STREAM(get_logger(), "applied req controls: " << request->controls().size());
     for (const auto &[id, value] : request->controls()) {
       const std::string &name = libcamera::controls::controls.at(id)->name();
       RCLCPP_DEBUG_STREAM(get_logger(), "applied control '" << name << "': " << (value.isNone() ? "NONE" : value.toString()));
@@ -769,6 +776,26 @@ CameraNode::process(libcamera::Request *const request)
 
     if (const int ret = camera->queueRequest(request); ret < 0) {
       RCLCPP_WARN_STREAM(get_logger(), "failed to queue request (" << request->toString() << "): " << strerror(-ret));
+    }
+
+    // TODO:
+    // "queueRequest()" calls "patchControlList" and fix "AeEnable" <-> "ExposureTimeMode"
+    // make sure the internal state matches the "controls()"
+
+    RCLCPP_INFO_STREAM(get_logger(), "queue req controls: " << request->controls().size());
+    for (const auto &[id, info] : request->controls()) {
+      RCLCPP_INFO_STREAM(
+        get_logger(),
+        "req controls: [" << libcamera::controls::controls.at(id)->name() << "]: " << info.toString());
+    }
+
+    parameter_handler.sync_control_values(request->controls());
+
+    RCLCPP_INFO_STREAM(get_logger(), "paha controls: " << parameter_handler.get_control_values().size());
+    for (const auto &[id, info] : parameter_handler.get_control_values()) {
+      RCLCPP_INFO_STREAM(
+        get_logger(),
+        "paha controls: [" << libcamera::controls::controls.at(id)->name() << "]: " << info.toString());
     }
   }
 }
