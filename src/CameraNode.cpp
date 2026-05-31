@@ -755,10 +755,12 @@ CameraNode::process(libcamera::Request *const request)
 
     pub_diagnostics->publish(diagnostic_array);
 
-    RCLCPP_INFO_STREAM(get_logger(), "req controls: " << request->controls().size());
-    for (const auto &[id, value] : request->controls()) {
-      const std::string &name = libcamera::controls::controls.at(id)->name();
-      RCLCPP_DEBUG_STREAM(get_logger(), "applied control '" << name << "': " << (value.isNone() ? "NONE" : value.toString()));
+    if (!request->controls().empty()) {
+      RCLCPP_INFO_STREAM(get_logger(), "req controls: " << request->controls().size());
+      for (const auto &[id, value] : request->controls()) {
+        const std::string &name = libcamera::controls::controls.at(id)->name();
+        RCLCPP_DEBUG_STREAM(get_logger(), "applied control '" << name << "': " << (value.isNone() ? "NONE" : value.toString()));
+      }
     }
 
     // redeclare implicitly undeclared parameters
@@ -768,10 +770,12 @@ CameraNode::process(libcamera::Request *const request)
     request->reuse(libcamera::Request::ReuseBuffers);
     parameter_handler.move_control_values(request->controls());
 
-    RCLCPP_INFO_STREAM(get_logger(), "req controls (before queue): " << request->controls().size());
-    for (const auto &[id, value] : request->controls()) {
-      const std::string &name = libcamera::controls::controls.at(id)->name();
-      RCLCPP_DEBUG_STREAM(get_logger(), "applied control '" << name << "': " << (value.isNone() ? "NONE" : value.toString()));
+    if (!request->controls().empty()) {
+      RCLCPP_INFO_STREAM(get_logger(), "req controls (before queue): " << request->controls().size());
+      for (const auto &[id, value] : request->controls()) {
+        const std::string &name = libcamera::controls::controls.at(id)->name();
+        RCLCPP_DEBUG_STREAM(get_logger(), "applied control '" << name << "': " << (value.isNone() ? "NONE" : value.toString()));
+      }
     }
 
     if (const int ret = camera->queueRequest(request); ret < 0) {
@@ -782,20 +786,24 @@ CameraNode::process(libcamera::Request *const request)
     // "queueRequest()" calls "patchControlList" and fix "AeEnable" <-> "ExposureTimeMode"
     // make sure the internal state matches the "controls()"
 
-    RCLCPP_INFO_STREAM(get_logger(), "req controls (after queue): " << request->controls().size());
-    for (const auto &[id, info] : request->controls()) {
-      RCLCPP_INFO_STREAM(
-        get_logger(),
-        "req controls: [" << libcamera::controls::controls.at(id)->name() << "]: " << info.toString());
+    if (!request->controls().empty()) {
+      RCLCPP_INFO_STREAM(get_logger(), "req controls (after queue): " << request->controls().size());
+      for (const auto &[id, info] : request->controls()) {
+        RCLCPP_INFO_STREAM(
+          get_logger(),
+          "req controls: [" << libcamera::controls::controls.at(id)->name() << "]: " << info.toString());
+      }
     }
 
     parameter_handler.sync_control_values(request->controls());
 
-    RCLCPP_INFO_STREAM(get_logger(), "paha controls: " << parameter_handler.get_control_values().size());
-    for (const auto &[id, info] : parameter_handler.get_control_values()) {
-      RCLCPP_INFO_STREAM(
-        get_logger(),
-        "paha controls: [" << libcamera::controls::controls.at(id)->name() << "]: " << info.toString());
+    if (!parameter_handler.get_control_values().empty()) {
+      RCLCPP_INFO_STREAM(get_logger(), "paha controls: " << parameter_handler.get_control_values().size());
+      for (const auto &[id, info] : parameter_handler.get_control_values()) {
+        RCLCPP_INFO_STREAM(
+          get_logger(),
+          "paha controls: [" << libcamera::controls::controls.at(id)->name() << "]: " << info.toString());
+      }
     }
   }
 }
