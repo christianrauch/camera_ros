@@ -245,6 +245,10 @@ ParameterHandler::sync_control_values(const libcamera::ControlList &controls)
   //   );
   //   control_values_lock.unlock();
 
+
+  // synchronise extern values to internal representation
+  // by setting parameters without calling the callbacks
+
   std::vector<rclcpp::Parameter> parameters_list;
   for (const auto &[id, value] : controls) {
     const std::string &name = libcamera::controls::controls.at(id)->name();
@@ -255,10 +259,10 @@ ParameterHandler::sync_control_values(const libcamera::ControlList &controls)
   }
 
   RCLCPP_ERROR_STREAM(node->get_logger(), "set parameters ...");
-  // inhibit_param_callbacks = true;
+  inhibit_param_callbacks = true;
   const rcl_interfaces::msg::SetParametersResult param_set_result =
     node->set_parameters_atomically(parameters_list);
-  // inhibit_param_callbacks = false;
+  inhibit_param_callbacks = false;
 
   if (!param_set_result.successful)
     RCLCPP_ERROR_STREAM(node->get_logger(), "Cannot set parameters: " << param_set_result.reason);
@@ -266,9 +270,9 @@ ParameterHandler::sync_control_values(const libcamera::ControlList &controls)
   RCLCPP_WARN_STREAM(node->get_logger(), "set parameters: " << param_set_result.reason);
 
   // do not apply again
-  control_values_lock.lock();
-  control_values.clear();
-  control_values_lock.unlock();
+  // control_values_lock.lock();
+  // control_values.clear();
+  // control_values_lock.unlock();
 }
 
 void
