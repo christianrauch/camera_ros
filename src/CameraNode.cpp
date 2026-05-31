@@ -768,7 +768,7 @@ CameraNode::process(libcamera::Request *const request)
     request->reuse(libcamera::Request::ReuseBuffers);
     parameter_handler.move_control_values(request->controls());
 
-    RCLCPP_INFO_STREAM(get_logger(), "applied req controls: " << request->controls().size());
+    RCLCPP_INFO_STREAM(get_logger(), "req controls (before queue): " << request->controls().size());
     for (const auto &[id, value] : request->controls()) {
       const std::string &name = libcamera::controls::controls.at(id)->name();
       RCLCPP_DEBUG_STREAM(get_logger(), "applied control '" << name << "': " << (value.isNone() ? "NONE" : value.toString()));
@@ -782,7 +782,7 @@ CameraNode::process(libcamera::Request *const request)
     // "queueRequest()" calls "patchControlList" and fix "AeEnable" <-> "ExposureTimeMode"
     // make sure the internal state matches the "controls()"
 
-    RCLCPP_INFO_STREAM(get_logger(), "queue req controls: " << request->controls().size());
+    RCLCPP_INFO_STREAM(get_logger(), "req controls (after queue): " << request->controls().size());
     for (const auto &[id, info] : request->controls()) {
       RCLCPP_INFO_STREAM(
         get_logger(),

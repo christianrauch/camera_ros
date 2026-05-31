@@ -264,6 +264,11 @@ ParameterHandler::sync_control_values(const libcamera::ControlList &controls)
     RCLCPP_ERROR_STREAM(node->get_logger(), "Cannot set parameters: " << param_set_result.reason);
 
   RCLCPP_WARN_STREAM(node->get_logger(), "set parameters: " << param_set_result.reason);
+
+  // do not apply again
+  control_values_lock.lock();
+  control_values.clear();
+  control_values_lock.unlock();
 }
 
 void
