@@ -246,12 +246,18 @@ ParameterHandler::redeclare()
 void
 ParameterHandler::PreSetResolve(std::vector<rclcpp::Parameter> &parameters)
 {
+  if (inhibit_param_callbacks)
+    return;
+
   parameter_conflict_handler.restore(parameters);
 }
 
 rcl_interfaces::msg::SetParametersResult
 ParameterHandler::OnSetValidate(const std::vector<rclcpp::Parameter> &parameters)
 {
+  if (inhibit_param_callbacks)
+    return rcl_interfaces::msg::SetParametersResult().set__successful(true);
+
 #ifdef RCLCPP_HAS_PARAM_EXT_CB
   const rcl_interfaces::msg::SetParametersResult result = format_result(validate_new_parameters(parameters));
 #else
@@ -272,6 +278,9 @@ ParameterHandler::OnSetValidate(const std::vector<rclcpp::Parameter> &parameters
 void
 ParameterHandler::PostSetApply(const std::vector<rclcpp::Parameter> &parameters)
 {
+  if (inhibit_param_callbacks)
+    return;
+
   control_values_lock.lock();
 
   // New parameter/control values are only applied when the next request callback

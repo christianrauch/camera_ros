@@ -1,5 +1,6 @@
 #pragma once
 #include "ParameterConflictHandler.hpp"
+#include <atomic>
 #include <functional>
 #include <libcamera/controls.h>
 #include <mutex>
@@ -55,6 +56,8 @@ private:
   std::mutex control_values_lock;
 
   std::unordered_map<std::string, rcl_interfaces::msg::ParameterDescriptor> parameter_descriptors;
+
+  std::atomic<bool> inhibit_param_callbacks = false;
 
   void
   PreSetResolve(std::vector<rclcpp::Parameter> &parameters);
