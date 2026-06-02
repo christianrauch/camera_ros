@@ -770,6 +770,10 @@ CameraNode::process(libcamera::Request *const request)
     if (const int ret = camera->queueRequest(request); ret < 0) {
       RCLCPP_WARN_STREAM(get_logger(), "failed to queue request (" << request->toString() << "): " << strerror(-ret));
     }
+
+    if (!parameter_handler.sync_control_values(request->controls())) {
+      RCLCPP_WARN_STREAM(get_logger(), "Failed to synchronise control values of queued request!");
+    }
   }
 }
 

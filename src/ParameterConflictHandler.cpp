@@ -87,10 +87,6 @@ is_set(const ParameterConflictHandler::ParameterValueMap &p,
   return p.count(name) && (p.at(name).get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET);
 }
 
-ParameterConflictHandler::ParameterConflictHandler()
-{
-}
-
 std::vector<std::string>
 ParameterConflictHandler::resolve_defaults(ParameterValueMap &p)
 {

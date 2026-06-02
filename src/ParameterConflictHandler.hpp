@@ -11,8 +11,6 @@ class ParameterConflictHandler
 public:
   typedef std::unordered_map<std::string, rclcpp::ParameterValue> ParameterValueMap;
 
-  ParameterConflictHandler();
-
   std::vector<std::string>
   resolve_defaults(ParameterValueMap &p);
 

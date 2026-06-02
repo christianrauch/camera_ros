@@ -30,6 +30,9 @@ public:
   void
   move_control_values(libcamera::ControlList &controls);
 
+  bool
+  sync_control_values(const libcamera::ControlList &controls);
+
   void
   redeclare();
 
