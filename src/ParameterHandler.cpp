@@ -273,6 +273,13 @@ ParameterHandler::redeclare()
 void
 ParameterHandler::PreSetResolve(std::vector<rclcpp::Parameter> &parameters)
 {
+  // If an empty parameter list is set, only the "pre_set_parameters" callback
+  // will be called. This invalidates assumptions about how the order of parameter
+  // callbacks (pre_set -> on_set -> post_set) manipulate the internal state.
+  // Skip the "pre_set_parameters" callback when no parameters are provided.
+  if (parameters.empty())
+    return;
+
   parameter_conflict_handler.restore(parameters);
 }
 
