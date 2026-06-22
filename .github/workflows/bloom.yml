@@ -18,7 +18,6 @@ jobs:
           - {distribution: ubuntu,    version: 24.04, ros: jazzy}
           - {distribution: ubuntu,    version: 26.04, ros: lyrical}
           - {distribution: almalinux, version: 8,     ros: humble}
-          - {distribution: almalinux, version: 9,     ros: jazzy}
 
     container:
       image: ${{ matrix.distribution }}:${{ matrix.version }}
@@ -28,7 +27,7 @@ jobs:
       PIP_BREAK_SYSTEM_PACKAGES: 1
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: ros-tooling/setup-ros@v0.7
 

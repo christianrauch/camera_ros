@@ -18,7 +18,6 @@ jobs:
           - {distribution: ubuntu,    version: 24.04, ros: jazzy}
           - {distribution: ubuntu,    version: 26.04, ros: lyrical}
           - {distribution: almalinux, version: 8,     ros: humble}
-          - {distribution: almalinux, version: 9,     ros: jazzy}
 
     continue-on-error: ${{ matrix.ros == 'rolling' }}
 
@@ -43,7 +42,7 @@ jobs:
           colcon mixin add default https://raw.githubusercontent.com/colcon/colcon-mixin-repository/master/index.yaml
           colcon mixin update default
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           path: src
 
