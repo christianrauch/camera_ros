@@ -121,6 +121,9 @@ private:
   std::atomic_uint8_t jpeg_quality;
 
   void
+  onDisconnect();
+
+  void
   requestComplete(libcamera::Request *const request);
 
   void
@@ -393,6 +396,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   if (camera->acquire())
     throw std::runtime_error("failed to acquire camera");
 
+  camera->disconnected.connect(this, &CameraNode::onDisconnect);
+
   std::vector<libcamera::StreamRole> roles {role};
 
   // Add the RAW role if the sensor_size is defined
@@ -605,6 +610,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
 
 CameraNode::~CameraNode()
 {
+  camera->disconnected.disconnect(this, &CameraNode::onDisconnect);
+
   // stop request callbacks
   camera->requestCompleted.disconnect(this, &CameraNode::requestComplete);
 
@@ -636,6 +643,30 @@ CameraNode::~CameraNode()
   for (const auto &e : buffer_info)
     if (munmap(e.second.data, e.second.size) == -1)
       std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
+}
+
+void
+CameraNode::onDisconnect()
+{
+  RCLCPP_FATAL_STREAM(get_logger(), "camera '" << camera->id() << "' disconnected!");
+
+  if (pub_diagnostics->get_subscription_count()) {
+    diagnostic_msgs::msg::DiagnosticArray diagnostic_array;
+    diagnostic_array.header.stamp = this->now();
+    diagnostic_array.header.frame_id = frame_id;
+
+    diagnostic_msgs::msg::DiagnosticStatus diagnostic_status;
+    diagnostic_status.hardware_id = camera->id();
+    diagnostic_status.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+    diagnostic_status.message = "camera disconnected";
+
+    diagnostic_array.status.push_back(diagnostic_status);
+    pub_diagnostics->publish(diagnostic_array);
+  }
+
+  running = false;
+  for (auto &[req, condvar] : request_condvars)
+    condvar.notify_all();
 }
 
 void
@@ -780,6 +811,10 @@ CameraNode::process(libcamera::Request *const request)
 
     if (const int ret = camera->queueRequest(request); ret < 0) {
       RCLCPP_WARN_STREAM(get_logger(), "failed to queue request (" << request->toString() << "): " << strerror(-ret));
+      if (ret == -ENODEV || ret == -EACCES) {
+        running = false;
+        return;
+      }
     }
 
     if (!parameter_handler.sync_control_values(request->controls())) {
