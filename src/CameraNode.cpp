@@ -802,7 +802,7 @@ CameraNode::requestComplete(libcamera::Request *const request)
 void
 CameraNode::process(libcamera::Request *const request)
 {
-  while (rclcpp::ok()) {
+  while (true) {
     // block until request is available
     std::unique_lock lk(request_mutexes.at(request));
     request_condvars.at(request).wait(lk);
