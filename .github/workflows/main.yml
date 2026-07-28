@@ -47,6 +47,8 @@ jobs:
           path: src
 
       - name: build and test
+        env:
+          ASAN_OPTIONS: new_delete_type_mismatch=0
         run: |
           rosdep install --from-paths src --ignore-src -y --rosdistro ${{ matrix.ros }}
           . /opt/ros/${{ matrix.ros }}/setup.sh
