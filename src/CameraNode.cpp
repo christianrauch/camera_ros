@@ -79,8 +79,10 @@ public:
   ~CameraNode();
 
 private:
-  libcamera::CameraManager camera_manager;
+  static libcamera::CameraManager camera_manager;
+  static std::mutex camera_manager_mutex;
   std::shared_ptr<libcamera::Camera> camera;
+  static std::atomic<size_t> cameras_in_use;
   libcamera::Stream *stream;
   std::shared_ptr<libcamera::FrameBufferAllocator> allocator;
   std::vector<std::unique_ptr<libcamera::Request>> requests;
@@ -137,6 +139,10 @@ private:
   onParameterChange(const std::vector<rclcpp::Parameter> &parameters);
 #endif
 };
+
+libcamera::CameraManager CameraNode::camera_manager = {};
+std::atomic<size_t> CameraNode::cameras_in_use = 0;
+std::mutex camera::CameraNode::camera_manager_mutex;
 
 RCLCPP_COMPONENTS_REGISTER_NODE(camera::CameraNode)
 
@@ -348,6 +354,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 1);
 
   // start camera manager and check for cameras
+  std::scoped_lock camera_manager_lk(camera_manager_mutex);
   const int ec_start = camera_manager.start();
   if (ec_start < 0)
     throw std::runtime_error("failed to start camera manager: " + std::string(std::strerror(-ec_start)));
@@ -393,8 +400,17 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   if (!camera)
     throw std::runtime_error("failed to find camera");
 
-  if (camera->acquire())
-    throw std::runtime_error("failed to acquire camera");
+  switch (camera->acquire()) {
+  case 0:
+    // OK
+    break;
+  case -ENODEV:
+    throw std::runtime_error("failed to acquire camera: The camera has been disconnected from the system");
+  case -EBUSY:
+    throw std::runtime_error("failed to acquire camera: The camera is not free and can't be acquired by the caller");
+  default:
+    throw std::runtime_error("failed to acquire camera: unknown status");
+  }
 
   camera->disconnected.connect(this, &CameraNode::onDisconnect);
 
@@ -597,8 +613,19 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   camera->requestCompleted.connect(this, &CameraNode::requestComplete);
 
   // start camera with initial controls
-  if (camera->start(&parameter_handler.get_control_values()))
-    throw std::runtime_error("failed to start camera");
+  switch (camera->start(&parameter_handler.get_control_values())) {
+  case 0:
+    // OK
+    break;
+  case -ENODEV:
+    throw std::runtime_error("failed to start camera: The camera has been disconnected from the system");
+  case -EBUSY:
+    throw std::runtime_error("failed to start camera: The camera is not in a state where it can be started");
+  default:
+    throw std::runtime_error("failed to start camera: unknown status");
+  }
+
+  cameras_in_use++;
 
   // queue all requests
   for (std::unique_ptr<libcamera::Request> &request : requests) {
@@ -635,11 +662,23 @@ CameraNode::~CameraNode()
     RCLCPP_ERROR_STREAM(get_logger(), "failed to free buffers: " << std::strerror(-ec_alloc_free));
   }
   allocator.reset();
-  if (camera->release() < 0) {
-    RCLCPP_ERROR_STREAM(get_logger(), "camera is busy and cannot be released");
+  switch (camera->release()) {
+  case 0:
+    // OK
+    break;
+  case -EBUSY:
+    RCLCPP_ERROR_STREAM(get_logger(), "failed to release camera: The camera is running and can't be released");
+    break;
+  default:
+    RCLCPP_ERROR_STREAM(get_logger(), "failed to release camera: unknown status");
   }
   camera.reset();
-  camera_manager.stop();
+  camera_manager_mutex.lock();
+  cameras_in_use--;
+  if (cameras_in_use == 0) {
+    camera_manager.stop();
+  }
+  camera_manager_mutex.unlock();
   for (const auto &e : buffer_info)
     if (munmap(e.second.data, e.second.size) == -1)
       std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
