@@ -393,8 +393,17 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   if (!camera)
     throw std::runtime_error("failed to find camera");
 
-  if (camera->acquire())
-    throw std::runtime_error("failed to acquire camera");
+  switch (camera->acquire()) {
+  case 0:
+    // OK
+    break;
+  case -ENODEV:
+    throw std::runtime_error("failed to acquire camera: The camera has been disconnected from the system");
+  case -EBUSY:
+    throw std::runtime_error("failed to acquire camera: The camera is not free and can't be acquired by the caller");
+  default:
+    throw std::runtime_error("failed to acquire camera: unknown status");
+  }
 
   camera->disconnected.connect(this, &CameraNode::onDisconnect);
 
@@ -597,8 +606,17 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   camera->requestCompleted.connect(this, &CameraNode::requestComplete);
 
   // start camera with initial controls
-  if (camera->start(&parameter_handler.get_control_values()))
-    throw std::runtime_error("failed to start camera");
+  switch (camera->start(&parameter_handler.get_control_values())) {
+  case 0:
+    // OK
+    break;
+  case -ENODEV:
+    throw std::runtime_error("failed to start camera: The camera has been disconnected from the system");
+  case -EBUSY:
+    throw std::runtime_error("failed to start camera: The camera is not in a state where it can be started");
+  default:
+    throw std::runtime_error("failed to start camera: unknown status");
+  }
 
   // queue all requests
   for (std::unique_ptr<libcamera::Request> &request : requests) {
@@ -635,8 +653,15 @@ CameraNode::~CameraNode()
     RCLCPP_ERROR_STREAM(get_logger(), "failed to free buffers: " << std::strerror(-ec_alloc_free));
   }
   allocator.reset();
-  if (camera->release() < 0) {
-    RCLCPP_ERROR_STREAM(get_logger(), "camera is busy and cannot be released");
+  switch (camera->release()) {
+  case 0:
+    // OK
+    break;
+  case -EBUSY:
+    RCLCPP_ERROR_STREAM(get_logger(), "failed to release camera: The camera is running and can't be released");
+    break;
+  default:
+    RCLCPP_ERROR_STREAM(get_logger(), "failed to release camera: unknown status");
   }
   camera.reset();
   camera_manager.stop();
