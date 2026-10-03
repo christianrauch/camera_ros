@@ -123,7 +123,41 @@ private:
   std::atomic_uint8_t jpeg_quality;
 
   void
+  selectCamera();
+
+  void
+  acquireCamera();
+
+  void
+  findConfiguration();
+
+  void
+  applyConfiguration();
+
+  void
+  loadCalibration();
+
+  void
+  setupCamera();
+
+  void
+  stopCamera();
+
+  void
   onDisconnect();
+
+  std::unique_ptr<libcamera::CameraConfiguration> cfg;
+
+  // camera settings
+  std::string format;
+  libcamera::StreamRole role;
+  libcamera::Size size;
+  libcamera::Size sensor_size;
+  rclcpp::ParameterValue camera_id;
+  std::string camera_info_url;
+#if LIBCAMERA_VER_GE(0, 2, 0)
+  libcamera::Orientation orientation;
+#endif
 
   void
   requestComplete(libcamera::Request *const request);
@@ -268,29 +302,28 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   rcl_interfaces::msg::ParameterDescriptor param_descr_format;
   param_descr_format.description = "pixel format of streaming buffer";
   param_descr_format.read_only = true;
-  const std::string &format = declare_parameter<std::string>("format", {}, param_descr_format);
+  format = declare_parameter<std::string>("format", {}, param_descr_format);
 
   // stream role
   rcl_interfaces::msg::ParameterDescriptor param_descr_role;
   param_descr_role.description = "stream role";
   param_descr_role.additional_constraints = "one of {raw, still, video, viewfinder}";
   param_descr_role.read_only = true;
-  const libcamera::StreamRole role =
-    get_role(declare_parameter<std::string>("role", "viewfinder", param_descr_role));
+  role = get_role(declare_parameter<std::string>("role", "viewfinder", param_descr_role));
 
   // image dimensions
   rcl_interfaces::msg::ParameterDescriptor param_descr_ro;
   param_descr_ro.read_only = true;
   const uint32_t w = declare_parameter<int64_t>("width", {}, param_descr_ro);
   const uint32_t h = declare_parameter<int64_t>("height", {}, param_descr_ro);
-  const libcamera::Size size {w, h};
+  size = {w, h};
 
   // Raw format dimensions
   rcl_interfaces::msg::ParameterDescriptor param_descr_sensor_mode;
   param_descr_sensor_mode.description = "raw mode of the sensor";
   param_descr_sensor_mode.additional_constraints = "string in format [width]:[height]";
   param_descr_sensor_mode.read_only = true;
-  const libcamera::Size sensor_size = get_sensor_format(declare_parameter<std::string>("sensor_mode", {}, param_descr_sensor_mode));
+  sensor_size = get_sensor_format(declare_parameter<std::string>("sensor_mode", {}, param_descr_sensor_mode));
 
   // camera frame_id
   frame_id = declare_parameter<std::string>("frame_id", "camera", param_descr_ro);
@@ -306,7 +339,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   constexpr int orientation_angle_default = 0;
   const int angle = declare_parameter<int>("orientation", orientation_angle_default, param_descr_orientation);
 #if LIBCAMERA_VER_GE(0, 2, 0)
-  const libcamera::Orientation orientation = libcamera::orientationFromRotation(angle);
+  orientation = libcamera::orientationFromRotation(angle);
 #else
   if (angle != orientation_angle_default) {
     RCLCPP_WARN_STREAM(get_logger(), "parameter 'orientation' not supported on libcamera " << LIBCAMERA_VERSION_MAJOR << "." << LIBCAMERA_VERSION_MINOR);
@@ -317,9 +350,10 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   rcl_interfaces::msg::ParameterDescriptor param_descr_camera_info_url;
   param_descr_camera_info_url.description = "camera calibration info file url";
   param_descr_camera_info_url.read_only = true;
+  camera_info_url = declare_parameter<std::string>("camera_info_url", {}, param_descr_camera_info_url);
 
   // camera ID
-  const rclcpp::ParameterValue &camera_id =
+  camera_id =
     declare_parameter("camera", rclcpp::ParameterValue {}, param_descr_ro.set__dynamic_typing(true));
 
   // we cannot control the compression rate of the libcamera MJPEG stream
@@ -354,13 +388,22 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 1);
 
   // start camera manager and check for cameras
-  std::scoped_lock camera_manager_lk(camera_manager_mutex);
-  const int ec_start = camera_manager.start();
-  if (ec_start < 0)
-    throw std::runtime_error("failed to start camera manager: " + std::string(std::strerror(-ec_start)));
-  if (camera_manager.cameras().empty())
-    throw std::runtime_error("no cameras available");
+  {
+    std::scoped_lock camera_manager_lk(camera_manager_mutex);
+    const int ec_start = camera_manager.start();
+    if (ec_start < 0)
+      throw std::runtime_error("failed to start camera manager: " + std::string(std::strerror(-ec_start)));
+    if (camera_manager.cameras().empty())
+      throw std::runtime_error("no cameras available");
+  }
 
+  setupCamera();
+  cameras_in_use++;
+}
+
+void
+CameraNode::selectCamera()
+{
   // get the camera
   switch (camera_id.get_type()) {
   case rclcpp::ParameterType::PARAMETER_NOT_SET:
@@ -399,7 +442,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
 
   if (!camera)
     throw std::runtime_error("failed to find camera");
+}
 
+void
+CameraNode::acquireCamera()
+{
   switch (camera->acquire()) {
   case 0:
     // OK
@@ -413,7 +460,11 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   }
 
   camera->disconnected.connect(this, &CameraNode::onDisconnect);
+}
 
+void
+CameraNode::findConfiguration()
+{
   std::vector<libcamera::StreamRole> roles {role};
 
   // Add the RAW role if the sensor_size is defined
@@ -422,8 +473,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   }
 
   // configure camera stream
-  std::unique_ptr<libcamera::CameraConfiguration> cfg =
-    camera->generateConfiguration(roles);
+  cfg = camera->generateConfiguration(roles);
 
   if (!cfg || cfg->size() != roles.size())
     throw std::runtime_error("failed to generate configuration for all roles");
@@ -512,6 +562,12 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     throw std::runtime_error("failed to validate stream configurations");
     break;
   }
+}
+
+void
+CameraNode::applyConfiguration()
+{
+  const libcamera::StreamConfiguration &scfg = cfg->at(0);
 
   switch (camera->configure(cfg.get())) {
   case -ENODEV:
@@ -525,6 +581,12 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
                                                  << scfg.toString() << " stream");
     break;
   }
+}
+
+void
+CameraNode::loadCalibration()
+{
+  const libcamera::StreamConfiguration &scfg = cfg->at(0);
 
   // format camera name for calibration file
   const libcamera::ControlList &props = camera->properties();
@@ -545,19 +607,27 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   if (!cim.setCameraName(cname))
     throw std::runtime_error("camera name must only contain alphanumeric characters");
 
-  const std::string &camera_info_url = declare_parameter<std::string>(
-    "camera_info_url", {}, param_descr_camera_info_url);
   if (!cim.loadCameraInfo(camera_info_url)) {
     if (!camera_info_url.empty()) {
       RCLCPP_WARN_STREAM(get_logger(), "failed to load camera calibration info from provided URL, using default URL");
       cim.loadCameraInfo({});
     }
   }
+}
+
+void
+CameraNode::setupCamera()
+{
+  selectCamera();
+  acquireCamera();
+  findConfiguration();
+  applyConfiguration();
+  loadCalibration();
 
   parameter_handler.declare(camera->controls());
 
   // allocate stream buffers and create one request per buffer
-  stream = scfg.stream();
+  stream = cfg->at(0).stream();
 
   allocator = std::make_shared<libcamera::FrameBufferAllocator>(camera);
   const int nbuffer = allocator->allocate(stream);
@@ -625,8 +695,6 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
     throw std::runtime_error("failed to start camera: unknown status");
   }
 
-  cameras_in_use++;
-
   // queue all requests
   for (std::unique_ptr<libcamera::Request> &request : requests) {
     if (const int ret = camera->queueRequest(request.get()); ret < 0) {
@@ -635,8 +703,12 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
   }
 }
 
-CameraNode::~CameraNode()
+void
+CameraNode::stopCamera()
 {
+  if (!camera)
+    return;
+
   camera->disconnected.disconnect(this, &CameraNode::onDisconnect);
 
   // stop request callbacks
@@ -652,16 +724,21 @@ CameraNode::~CameraNode()
   // wait for all currently running threads to finish
   for (std::thread &thread : request_threads)
     thread.join();
+  request_threads.clear();
 
   // stop camera
   if (camera->stop()) {
     RCLCPP_ERROR_STREAM(get_logger(), "failed to stop camera");
   }
+  // requests reference the buffers and must be destroyed before them
+  requests.clear();
   const int ec_alloc_free = allocator->free(stream);
   if (ec_alloc_free < 0) {
     RCLCPP_ERROR_STREAM(get_logger(), "failed to free buffers: " << std::strerror(-ec_alloc_free));
   }
   allocator.reset();
+  request_mutexes.clear();
+  request_condvars.clear();
   switch (camera->release()) {
   case 0:
     // OK
@@ -673,15 +750,21 @@ CameraNode::~CameraNode()
     RCLCPP_ERROR_STREAM(get_logger(), "failed to release camera: unknown status");
   }
   camera.reset();
-  camera_manager_mutex.lock();
+  for (const auto &e : buffer_info)
+    if (munmap(e.second.data, e.second.size) == -1)
+      std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
+  buffer_info.clear();
+}
+
+CameraNode::~CameraNode()
+{
+  stopCamera();
+
+  std::scoped_lock lk(camera_manager_mutex);
   cameras_in_use--;
   if (cameras_in_use == 0) {
     camera_manager.stop();
   }
-  camera_manager_mutex.unlock();
-  for (const auto &e : buffer_info)
-    if (munmap(e.second.data, e.second.size) == -1)
-      std::cerr << "munmap failed: " << std::strerror(errno) << std::endl;
 }
 
 void
