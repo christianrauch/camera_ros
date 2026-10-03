@@ -7,8 +7,11 @@
 #include <cassert>
 #include <cctype>
 #include <cerrno>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstring>
+#include <mutex>
 #if __has_include(<cv_bridge/cv_bridge.hpp>)
 #include <cv_bridge/cv_bridge.hpp>
 #elif __has_include(<cv_bridge/cv_bridge.h>)
@@ -132,6 +135,9 @@ private:
   findConfiguration();
 
   void
+  restoreConfiguration();
+
+  void
   applyConfiguration();
 
   void
@@ -141,12 +147,24 @@ private:
   setupCamera();
 
   void
+  onCameraAdded(std::shared_ptr<libcamera::Camera> added);
+
+  void
   stopCamera();
 
   void
   onDisconnect();
 
   std::unique_ptr<libcamera::CameraConfiguration> cfg;
+
+  // state for restarting the camera after a reconnect
+  std::string camera_model;
+  bool first_setup_done = false;
+  std::vector<libcamera::StreamConfiguration> stream_configs;
+  std::vector<libcamera::StreamRole> stream_roles;
+
+  std::mutex camera_state_mutex;
+  std::atomic<bool> camera_disconnected = false;
 
   // camera settings
   std::string format;
@@ -399,6 +417,8 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
 
   setupCamera();
   cameras_in_use++;
+
+  camera_manager.cameraAdded.connect(this, &CameraNode::onCameraAdded);
 }
 
 void
@@ -442,6 +462,10 @@ CameraNode::selectCamera()
 
   if (!camera)
     throw std::runtime_error("failed to find camera");
+
+  camera_id = rclcpp::ParameterValue {camera->id()};
+  camera_model = std::string(
+    camera->properties().get(libcamera::properties::Model).value_or("UNDEFINED"));
 }
 
 void
@@ -465,17 +489,17 @@ CameraNode::acquireCamera()
 void
 CameraNode::findConfiguration()
 {
-  std::vector<libcamera::StreamRole> roles {role};
+  stream_roles = {role};
 
   // Add the RAW role if the sensor_size is defined
   if (!sensor_size.isNull() && role != libcamera::StreamRole::Raw) {
-    roles.push_back(libcamera::StreamRole::Raw);
+    stream_roles.push_back(libcamera::StreamRole::Raw);
   }
 
   // configure camera stream
-  cfg = camera->generateConfiguration(roles);
+  cfg = camera->generateConfiguration(stream_roles);
 
-  if (!cfg || cfg->size() != roles.size())
+  if (!cfg || cfg->size() != stream_roles.size())
     throw std::runtime_error("failed to generate configuration for all roles");
 
 #if LIBCAMERA_VER_GE(0, 2, 0)
@@ -562,6 +586,30 @@ CameraNode::findConfiguration()
     throw std::runtime_error("failed to validate stream configurations");
     break;
   }
+
+  for (size_t i = 0; i < cfg->size(); i++)
+    stream_configs.push_back(cfg->at(i));
+}
+
+void
+CameraNode::restoreConfiguration()
+{
+  // the configuration is bound to the camera object, so generate a new one from the stored settings
+  cfg = camera->generateConfiguration(stream_roles);
+  if (!cfg || cfg->size() != stream_roles.size())
+    throw std::runtime_error("failed to generate configuration for all roles");
+
+#if LIBCAMERA_VER_GE(0, 2, 0)
+  cfg->orientation = orientation;
+#endif
+
+  for (size_t i = 0; i < cfg->size(); i++) {
+    cfg->at(i).pixelFormat = stream_configs.at(i).pixelFormat;
+    cfg->at(i).size = stream_configs.at(i).size;
+    cfg->at(i).bufferCount = stream_configs.at(i).bufferCount;
+  }
+  if (cfg->validate() == libcamera::CameraConfiguration::Invalid)
+    throw std::runtime_error("failed to validate stream configurations");
 }
 
 void
@@ -618,13 +666,19 @@ CameraNode::loadCalibration()
 void
 CameraNode::setupCamera()
 {
-  selectCamera();
+  if (!camera)
+    selectCamera();
   acquireCamera();
-  findConfiguration();
+  if (!first_setup_done)
+    findConfiguration();
+  else
+    restoreConfiguration();
   applyConfiguration();
-  loadCalibration();
-
-  parameter_handler.declare(camera->controls());
+  if (!first_setup_done) {
+    loadCalibration();
+    parameter_handler.declare(camera->controls());
+    first_setup_done = true;
+  }
 
   // allocate stream buffers and create one request per buffer
   stream = cfg->at(0).stream();
@@ -726,14 +780,14 @@ CameraNode::stopCamera()
     thread.join();
   request_threads.clear();
 
-  // stop camera
-  if (camera->stop()) {
+  // stop camera (fails if the camera has been disconnected)
+  if (camera->stop() && !camera_disconnected) {
     RCLCPP_ERROR_STREAM(get_logger(), "failed to stop camera");
   }
   // requests reference the buffers and must be destroyed before them
   requests.clear();
   const int ec_alloc_free = allocator->free(stream);
-  if (ec_alloc_free < 0) {
+  if (ec_alloc_free < 0 && !camera_disconnected) {
     RCLCPP_ERROR_STREAM(get_logger(), "failed to free buffers: " << std::strerror(-ec_alloc_free));
   }
   allocator.reset();
@@ -747,7 +801,8 @@ CameraNode::stopCamera()
     RCLCPP_ERROR_STREAM(get_logger(), "failed to release camera: The camera is running and can't be released");
     break;
   default:
-    RCLCPP_ERROR_STREAM(get_logger(), "failed to release camera: unknown status");
+    if (!camera_disconnected)
+      RCLCPP_ERROR_STREAM(get_logger(), "failed to release camera: unknown status");
   }
   camera.reset();
   for (const auto &e : buffer_info)
@@ -758,7 +813,15 @@ CameraNode::stopCamera()
 
 CameraNode::~CameraNode()
 {
-  stopCamera();
+  camera_manager.cameraAdded.disconnect(this, &CameraNode::onCameraAdded);
+  if (camera)
+    camera->disconnected.disconnect(this, &CameraNode::onDisconnect);
+
+  {
+    // wait for running signal handlers
+    std::lock_guard lk(camera_state_mutex);
+    stopCamera();
+  }
 
   std::scoped_lock lk(camera_manager_mutex);
   cameras_in_use--;
@@ -770,7 +833,7 @@ CameraNode::~CameraNode()
 void
 CameraNode::onDisconnect()
 {
-  RCLCPP_FATAL_STREAM(get_logger(), "camera '" << camera->id() << "' disconnected!");
+  RCLCPP_WARN_STREAM(get_logger(), "camera '" << camera->properties().get(libcamera::properties::Model).value_or("UNDEFINED") << "' (" << camera->id() << ") disconnected, pausing until it is reconnected");
 
   if (pub_diagnostics->get_subscription_count()) {
     diagnostic_msgs::msg::DiagnosticArray diagnostic_array;
@@ -786,9 +849,39 @@ CameraNode::onDisconnect()
     pub_diagnostics->publish(diagnostic_array);
   }
 
-  running = false;
-  for (auto &[req, condvar] : request_condvars)
-    condvar.notify_all();
+  std::lock_guard lk(camera_state_mutex);
+  camera_disconnected = true;
+  stopCamera();
+}
+
+void
+CameraNode::onCameraAdded(std::shared_ptr<libcamera::Camera> added)
+{
+  std::lock_guard lk(camera_state_mutex);
+  if (!camera_disconnected)
+    return;
+
+  if (added->id() != camera_id.get<std::string>()) {
+    RCLCPP_ERROR_STREAM(get_logger(), "a different camera '"
+                                        << added->properties().get(libcamera::properties::Model).value_or("UNDEFINED")
+                                        << "' (" << added->id() << ") was connected, but this node is waiting for camera '"
+                                        << camera_model << "' (" << camera_id.get<std::string>()
+                                        << "). Please reconnect the original camera '" << camera_model
+                                        << "' instead of the one that was just connected.");
+    return;
+  }
+
+  try {
+    camera = added;
+    setupCamera();
+  }
+  catch (const std::exception &e) {
+    RCLCPP_ERROR_STREAM(get_logger(), "failed to restart camera: " << e.what());
+    stopCamera();
+    return;
+  }
+  camera_disconnected = false;
+  RCLCPP_WARN_STREAM(get_logger(), "camera '" << camera->properties().get(libcamera::properties::Model).value_or("UNDEFINED") << "' (" << camera->id() << ") reconnected, resuming");
 }
 
 void
@@ -804,10 +897,14 @@ CameraNode::process(libcamera::Request *const request)
   while (true) {
     // block until request is available
     std::unique_lock lk(request_mutexes.at(request));
-    request_condvars.at(request).wait(lk);
+    request_condvars.at(request).wait_for(lk, std::chrono::milliseconds(100));
 
     if (!running)
       return;
+
+    // woken up without a completed request
+    if (request->status() == libcamera::Request::RequestPending)
+      continue;
 
     // prepare message header
     std_msgs::msg::Header hdr;
