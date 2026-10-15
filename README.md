@@ -16,7 +16,7 @@ sudo dnf install ros-$ROS_DISTRO-camera-ros
 ```
 
 > [!NOTE]
-> This also installs the package [`libcamera`](https://index.ros.org/r/libcamera/) as dependency. This is the bloomed version of the official upstream repo at https://git.libcamera.org/libcamera/libcamera.git and may not contain full support for all Raspberry Pi camera modules. If you need full camera module support on Raspberry Pi, you have to build the "raspberrypi" fork from https://github.com/raspberrypi/libcamera manually.
+> This also installs the package [`libcamera`](https://index.ros.org/r/libcamera/) as dependency. This is the bloomed version of the official upstream repo at https://gitlab.freedesktop.org/camera/libcamera.git and may not contain full support for all Raspberry Pi camera modules. If you need full camera module support on Raspberry Pi, you have to build the "raspberrypi" fork from https://github.com/raspberrypi/libcamera manually.
 
 
 ## Build Instructions
@@ -45,7 +45,7 @@ cd ~/camera_ws/src
 # check out libcamera
 sudo apt -y install python3-colcon-meson
 # Option A: official upstream
-git clone https://git.libcamera.org/libcamera/libcamera.git
+git clone https://gitlab.freedesktop.org/camera/libcamera.git
 # Option B: raspberrypi fork with support for newer camera modules
 # git clone https://github.com/raspberrypi/libcamera.git
 
