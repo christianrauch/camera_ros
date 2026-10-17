@@ -793,16 +793,17 @@ CameraNode::stopCamera()
   allocator.reset();
   request_mutexes.clear();
   request_condvars.clear();
-  switch (camera->release()) {
-  case 0:
-    // OK
-    break;
-  case -EBUSY:
-    RCLCPP_ERROR_STREAM(get_logger(), "failed to release camera: The camera is running and can't be released");
-    break;
-  default:
-    if (!camera_disconnected)
+  if (!camera_disconnected) {
+    switch (camera->release()) {
+    case 0:
+      // OK
+      break;
+    case -EBUSY:
+      RCLCPP_ERROR_STREAM(get_logger(), "failed to release camera: The camera is running and can't be released");
+      break;
+    default:
       RCLCPP_ERROR_STREAM(get_logger(), "failed to release camera: unknown status");
+    }
   }
   camera.reset();
   for (const auto &e : buffer_info)
@@ -959,6 +960,7 @@ CameraNode::process(libcamera::Request *const request)
 
       auto msg_img = std::make_unique<sensor_msgs::msg::Image>();
       auto msg_img_compressed = std::make_unique<sensor_msgs::msg::CompressedImage>();
+      bool frame_valid = true;
 
       if (format_type(cfg.pixelFormat) == FormatType::RAW) {
         // raw uncompressed image
@@ -981,31 +983,54 @@ CameraNode::process(libcamera::Request *const request)
           catch (const cv_bridge::Exception &e) {
             RCLCPP_ERROR_STREAM(get_logger(), e.what());
           }
+          catch (const cv::Exception &e) {
+            RCLCPP_ERROR_STREAM(get_logger(), e.what());
+          }
         }
       }
       else if (format_type(cfg.pixelFormat) == FormatType::COMPRESSED) {
         // compressed image
-        assert(bytesused < buffer_info[buffer].size);
-        msg_img_compressed->header = hdr;
-        msg_img_compressed->format = get_ros_encoding(cfg.pixelFormat);
-        msg_img_compressed->data.resize(bytesused);
-        memcpy(msg_img_compressed->data.data(), buffer_info[buffer].data, bytesused);
+        if (bytesused == 0) {
+          RCLCPP_WARN_STREAM_THROTTLE(get_logger(), *get_clock(), 5000,
+                                      "received empty compressed frame, skipping");
+          frame_valid = false;
+        }
+        else {
+          assert(bytesused <= buffer_info[buffer].size);
+          msg_img_compressed->header = hdr;
+          msg_img_compressed->format = get_ros_encoding(cfg.pixelFormat);
+          msg_img_compressed->data.resize(bytesused);
+          memcpy(msg_img_compressed->data.data(), buffer_info[buffer].data, bytesused);
 
-        // decompress into raw rgb8 image
-        if (pub_image->get_subscription_count())
-          cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
+          // decompress into raw rgb8 image
+          if (pub_image->get_subscription_count()) {
+            try {
+              cv_bridge::toCvCopy(*msg_img_compressed, "rgb8")->toImageMsg(*msg_img);
+            }
+            catch (const cv_bridge::Exception &e) {
+              RCLCPP_ERROR_STREAM(get_logger(), e.what());
+              frame_valid = false;
+            }
+            catch (const cv::Exception &e) {
+              RCLCPP_ERROR_STREAM(get_logger(), "failed to decode frame: " << e.what());
+              frame_valid = false;
+            }
+          }
+        }
       }
       else {
         throw std::runtime_error("unsupported pixel format: " +
                                  stream->configuration().pixelFormat.toString());
       }
 
-      pub_image->publish(std::move(msg_img));
-      pub_image_compressed->publish(std::move(msg_img_compressed));
+      if (frame_valid) {
+        pub_image->publish(std::move(msg_img));
+        pub_image_compressed->publish(std::move(msg_img_compressed));
 
-      sensor_msgs::msg::CameraInfo ci = cim.getCameraInfo();
-      ci.header = hdr;
-      pub_ci->publish(ci);
+        sensor_msgs::msg::CameraInfo ci = cim.getCameraInfo();
+        ci.header = hdr;
+        pub_ci->publish(ci);
+      }
     }
     else if (request->status() == libcamera::Request::RequestCancelled) {
       diagnostic_status.level = diagnostic_msgs::msg::DiagnosticStatus::WARN;
