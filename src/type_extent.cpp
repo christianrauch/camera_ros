@@ -12,7 +12,6 @@ get_extent(const libcamera::ControlId *const id)
 
 #else
 #include "exceptions.hpp"
-#include <libcamera/base/span.h>
 #include <libcamera/controls.h>
 #include <stdexcept>
 #include <string>
