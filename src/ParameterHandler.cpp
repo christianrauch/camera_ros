@@ -280,7 +280,7 @@ ParameterHandler::PreSetResolve(std::vector<rclcpp::Parameter> &parameters)
   if (parameters.empty())
     return;
 
-  parameter_conflict_handler.restore(parameters);
+  parameter_conflict_handler.restore(parameters, {});
 
   std::unordered_set<std::string> controls;
   for (const auto &[n, i] : camera_controls) {
