@@ -1,9 +1,9 @@
 #include "cv_to_pv.hpp"
 #include "libcamera_version_utils.hpp"
+#include "span.hpp"
 #include "type_extent.hpp"
 #include "types.hpp"
 #include <cstdint>
-#include <libcamera/base/span.h>
 #include <libcamera/controls.h>
 #include <libcamera/geometry.h>
 #include <rclcpp/parameter_value.hpp>
@@ -26,7 +26,7 @@ std::vector<T>
 extract_value(const libcamera::ControlValue &value)
 {
   if (value.isArray()) {
-    const libcamera::Span<const T> span = value.get<libcamera::Span<const T>>();
+    const cspan<const T> span = value.get<cspan<const T>>();
     return std::vector<T>(span.begin(), span.end());
   }
   else {

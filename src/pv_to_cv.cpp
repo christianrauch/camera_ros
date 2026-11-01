@@ -1,9 +1,9 @@
 #include "pv_to_cv.hpp"
 #include "exceptions.hpp"
 #include "libcamera_version_utils.hpp"
+#include "span.hpp"
 #include "types.hpp"
 #include <cstdint>
-#include <libcamera/base/span.h>
 #include <libcamera/controls.h>
 #include <libcamera/geometry.h>
 #include <rclcpp/parameter.hpp>
@@ -17,7 +17,7 @@
 
 #define CASE_CONVERT_INT_ARRAY(T) \
   case libcamera::ControlType##T: \
-    return libcamera::Span<const ControlTypeMap<libcamera::ControlType##T>::type>(std::vector<ControlTypeMap<libcamera::ControlType##T>::type>(values.begin(), values.end()));
+    return cspan<const ControlTypeMap<libcamera::ControlType##T>::type>(std::vector<ControlTypeMap<libcamera::ControlType##T>::type>(values.begin(), values.end()));
 
 #define CASE_NONE(T)              \
   case libcamera::ControlType##T: \
@@ -38,7 +38,7 @@ pv_to_cv_int_array(const std::vector<int64_t> &values, const libcamera::ControlT
     CASE_INVALID(Byte)
     CASE_CONVERT_INT_ARRAY(Integer32)
   case libcamera::ControlTypeInteger64:
-    return libcamera::Span<const CTInteger64>(values);
+    return cspan<const CTInteger64>(values);
 #if LIBCAMERA_VER_GE(0, 4, 0)
     CASE_CONVERT_INT_ARRAY(Unsigned16)
     CASE_CONVERT_INT_ARRAY(Unsigned32)
@@ -97,14 +97,14 @@ pv_to_cv(const rclcpp::Parameter &parameter, const libcamera::ControlType &type)
   case rclcpp::ParameterType::PARAMETER_STRING:
     return CTString(parameter.as_string());
   case rclcpp::ParameterType::PARAMETER_BYTE_ARRAY:
-    return libcamera::Span<const CTByte>(parameter.as_byte_array());
+    return cspan<const CTByte>(parameter.as_byte_array());
   case rclcpp::ParameterType::PARAMETER_BOOL_ARRAY:
     throw invalid_conversion("cannot convert bool array to control value");
   case rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY:
     return pv_to_cv_int_array(parameter.as_integer_array(), type);
   case rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY:
     // convert to float vector
-    return libcamera::Span<const CTFloat>(
+    return cspan<const CTFloat>(
       std::vector<CTFloat>(parameter.as_double_array().begin(), parameter.as_double_array().end()));
   case rclcpp::ParameterType::PARAMETER_STRING_ARRAY:
     // manually convert vector<string> to vector<string_view>
@@ -112,7 +112,7 @@ pv_to_cv(const rclcpp::Parameter &parameter, const libcamera::ControlType &type)
     for (const std::string &s : parameter.as_string_array()) {
       string_view_list.emplace_back(s);
     }
-    return libcamera::Span<const CTString>(string_view_list);
+    return cspan<const CTString>(string_view_list);
   }
   throw should_not_reach();
 }
