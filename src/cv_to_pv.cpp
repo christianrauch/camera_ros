@@ -1,7 +1,6 @@
 #include "cv_to_pv.hpp"
 #include "libcamera_version_utils.hpp"
 #include "span.hpp"
-#include "type_extent.hpp"
 #include "types.hpp"
 #include <cstdint>
 #include <libcamera/controls.h>
@@ -143,7 +142,7 @@ cv_to_pv(const libcamera::ControlValue &value)
 rclcpp::ParameterType
 cv_to_pv_type(const libcamera::ControlId *const id)
 {
-  if (get_extent(id) == 0) {
+  if (!id->isArray()) {
     switch (id->type()) {
     case libcamera::ControlType::ControlTypeNone:
       throw unsupported_control(id);
