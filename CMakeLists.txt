@@ -27,17 +27,17 @@ pkg_check_modules(libcamera REQUIRED libcamera>=0.1)
 
 # new param callbacks need at least 17.0.0
 if(${rclcpp_VERSION} VERSION_GREATER_EQUAL "17")
-    add_compile_definitions(RCLCPP_HAS_PARAM_EXT_CB)
+  add_compile_definitions(RCLCPP_HAS_PARAM_EXT_CB)
 endif()
 
 # "CameraInfoManager" constructor
 #  - with "NodeBaseInterface" only available from 4.1 onwards
 #  - overloaded with "rclcpp::QoS" from 6.3 onward
 if(${camera_info_manager_VERSION} VERSION_GREATER_EQUAL "4.1")
-    add_compile_definitions(CIM_HAS_NODE_INTERFACE)
+  add_compile_definitions(CIM_HAS_NODE_INTERFACE)
 endif()
 if(${camera_info_manager_VERSION} VERSION_GREATER_EQUAL "6.3")
-    add_compile_definitions(CIM_HAS_QoS)
+  add_compile_definitions(CIM_HAS_QoS)
 endif()
 
 # library with common utility functions for type conversions
@@ -55,14 +55,13 @@ set_property(TARGET utils PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # library for parameter/controls handling and conversion
 add_library(param OBJECT
-    src/clamp.cpp
-    src/cv_to_pv.cpp
-    src/pv_to_cv.cpp
-    src/types.cpp
-    src/type_extent.cpp
-    src/ParameterHandler.cpp
-    src/ParameterConflictHandler.cpp
-)
+  src/clamp.cpp
+  src/cv_to_pv.cpp
+  src/pv_to_cv.cpp
+  src/types.cpp
+  src/type_extent.cpp
+  src/ParameterHandler.cpp
+  src/ParameterConflictHandler.cpp)
 target_include_directories(param PUBLIC ${libcamera_INCLUDE_DIRS})
 target_link_libraries(param ${libcamera_LINK_LIBRARIES})
 target_link_libraries(
