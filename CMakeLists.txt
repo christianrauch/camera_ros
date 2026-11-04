@@ -40,6 +40,12 @@ if(${camera_info_manager_VERSION} VERSION_GREATER_EQUAL "6.3")
   add_compile_definitions(CIM_HAS_QoS)
 endif()
 
+# "RCL_STEADY_TIME" reads "CLOCK_MONOTONIC" (the clock of libcamera's
+# "SensorTimestamp") from 5.2.0 onwards, and "CLOCK_MONOTONIC_RAW" before
+if(${rcutils_VERSION} VERSION_GREATER_EQUAL "5.2.0")
+  add_compile_definitions(RCUTILS_STEADY_TIME_IS_MONOTONIC)
+endif()
+
 # library with common utility functions for type conversions
 add_library(utils OBJECT
   src/format_mapping.cpp
