@@ -919,7 +919,15 @@ CameraNode::process(libcamera::Request *const request)
     if (!use_node_time) {
       const libcamera::ControlList &req_metadata = request->metadata();
       if (const std::optional<int64_t> sensor_ts = req_metadata.get(libcamera::controls::SensorTimestamp)) {
+#ifdef RCUTILS_STEADY_TIME_IS_MONOTONIC
         sensor_latency = rclcpp::Clock(RCL_STEADY_TIME).now().nanoseconds() - sensor_ts.value();
+#else
+        // "SensorTimestamp" is "CLOCK_MONOTONIC", but "RCL_STEADY_TIME" is "CLOCK_MONOTONIC_RAW"
+        sensor_latency = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                           std::chrono::steady_clock::now().time_since_epoch())
+                           .count() -
+                         sensor_ts.value();
+#endif
       }
       else {
         RCLCPP_WARN_STREAM_ONCE(get_logger(), "sensor timestamp not available, falling back to node time as reference");
