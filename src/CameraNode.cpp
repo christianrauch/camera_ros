@@ -358,7 +358,7 @@ CameraNode::CameraNode(const rclcpp::NodeOptions &options)
 #if LIBCAMERA_VER_GE(0, 2, 0)
   orientation = libcamera::orientationFromRotation(angle)
 #if LIBCAMERA_VER_GE(0, 8, 0)
-                  .value_or({});
+                  .value_or<libcamera::Orientation>({});
 #endif
   ;
 #else
